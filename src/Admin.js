@@ -298,7 +298,7 @@ export default function Admin() {
                 const urls = [];
                 for (const file of files) {
                   const fileName = `${Date.now()}-${file.name}`;
-                  const { data, error } = await supabase.storage.from("project-images").upload(fileName, file);
+                  const { error } = await supabase.storage.from("project-images").upload(fileName, file);
                   if (!error) {
                     const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
                     urls.push(urlData.publicUrl);
