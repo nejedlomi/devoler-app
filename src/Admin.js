@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
 
@@ -225,7 +226,6 @@ export default function Admin() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Input label="Název projektu *" field="name" obj={form} setObj={setForm} />
-
               <div style={{ display: "flex", flexDirection: "column", gap: 4, position: "relative" }}>
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Lokalita / Adresa</label>
                 <input
@@ -249,7 +249,6 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-
               <Select label="Typ" field="type" options={["Novostavba", "Rekonstrukce"]} obj={form} setObj={setForm} />
               <Input label="Dokončení (např. Q2 2026)" field="completion" obj={form} setObj={setForm} />
               <Input label="Cena od (Kč)" field="price_from" type="number" obj={form} setObj={setForm} />
@@ -257,13 +256,11 @@ export default function Admin() {
               <Input label="Prodaných bytů" field="sold_units" type="number" obj={form} setObj={setForm} />
               <Input label="Počet podlaží" field="floors" type="number" obj={form} setObj={setForm} />
             </div>
-
             <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Popis</label>
               <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 style={{ width: "100%", marginTop: 4, padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a", boxSizing: "border-box" }} />
             </div>
-
             <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poloha na mapě (klikněte pro upřesnění)</label>
               <div id="map-container" style={{ marginTop: 6, height: 300, borderRadius: 8, border: "0.5px solid #ddd" }}></div>
@@ -271,7 +268,6 @@ export default function Admin() {
                 {form.lat ? `📍 ${form.lat.toFixed(5)}, ${form.lng.toFixed(5)}` : "Vyberte adresu nebo klikněte na mapu"}
               </div>
             </div>
-
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveProject} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("projects"); setForm({}); setSuggestions([]); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
