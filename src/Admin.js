@@ -10,6 +10,7 @@ export default function Admin() {
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
   const [suggestions, setSuggestions] = useState([]);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
@@ -224,6 +225,35 @@ export default function Admin() {
             <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>
               {form.id ? "Upravit projekt" : "Nový projekt"}
             </div>
+            <div style={{ marginBottom: 16, padding: 14, background: "#E1F5EE", borderRadius: 10, border: "0.5px solid #9FE1CB" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F6E56", marginBottom: 8 }}>📄 Nahrát PDF projektu — automatické vyplnění</div>
+              <input type="file" accept=".pdf" onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                  const base64 = ev.target.result.split(",")[1];
+                  setPdfLoading(true);
+                  try {
+                    const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/extract-pdf", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE`,
+                      },
+                      body: JSON.stringify({ pdfBase64: base64 }),
+                    });
+                    const parsed = await res.json();
+                    setForm(f => ({ ...f, ...parsed }));
+                  } catch (err) {
+                    alert("Chyba při zpracování PDF: " + err.message);
+                  }
+                  setPdfLoading(false);
+                };
+                reader.readAsDataURL(file);
+              }} style={{ fontSize: 13 }} />
+              {pdfLoading && <div style={{ marginTop: 8, fontSize: 13, color: "#0F6E56" }}>⏳ Zpracovávám PDF...</div>}
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Input label="Název projektu *" field="name" obj={form} setObj={setForm} />
               <div style={{ display: "flex", flexDirection: "column", gap: 4, position: "relative" }}>
@@ -260,6 +290,33 @@ export default function Admin() {
               <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Popis</label>
               <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 style={{ width: "100%", marginTop: 4, padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotky projektu</label>
+              <input type="file" accept="image/*" multiple onChange={async (e) => {
+                const files = Array.from(e.target.files);
+                const urls = [];
+                for (const file of files) {
+                  const fileName = `${Date.now()}-${file.name}`;
+                  const { data, error } = await supabase.storage.from("project-images").upload(fileName, file);
+                  if (!error) {
+                    const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
+                    urls.push(urlData.publicUrl);
+                  }
+                }
+                setForm(f => ({ ...f, images: [...(f.images || []), ...urls] }));
+              }} style={{ marginTop: 6, fontSize: 13 }} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                {(form.images || []).map((url, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    <img src={url} alt="" style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 8 }} />
+                    <button onClick={() => setForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                      style={{ position: "absolute", top: 2, right: 2, background: "#E24B4A", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
             <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poloha na mapě (klikněte pro upřesnění)</label>
