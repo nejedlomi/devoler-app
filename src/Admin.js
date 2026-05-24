@@ -128,6 +128,10 @@ export default function Admin() {
   const [reservations, setReservations] = useState([]);
   const [reservationForm, setReservationForm] = useState({});
   const [dismissedAlerts, setDismissedAlerts] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [documentForm, setDocumentForm] = useState({});
+  const [documentSearch, setDocumentSearch] = useState("");
+  const [documentFilter, setDocumentFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -257,6 +261,30 @@ export default function Admin() {
   const dismissAlert = async (key) => {
     await supabase.from("dismissed_alerts").upsert({ alert_key: key });
     setDismissedAlerts(prev => [...prev, key]);
+  };
+
+  const loadDocuments = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("documents")
+      .select("*, projects(name), units(unit_number, disp), contacts(name)")
+      .order("created_at", { ascending: false });
+    setDocuments(data || []);
+    setLoading(false);
+    setView("documents");
+  };
+
+  const saveDocument = async () => {
+    const { id, projects, units, contacts, ...data } = documentForm;
+    if (id) { await supabase.from("documents").update(data).eq("id", id); }
+    else { await supabase.from("documents").insert(data); }
+    setDocumentForm({});
+    loadDocuments();
+  };
+
+  const deleteDocument = async (id, url) => {
+    if (!window.confirm("Smazat dokument?")) return;
+    await supabase.from("documents").delete().eq("id", id);
+    loadDocuments();
   };
 
   const saveProject = async () => {
@@ -514,6 +542,7 @@ export default function Admin() {
           <button onClick={() => { loadContacts(); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👥 Kontakty</button>
           <button onClick={() => loadLeads()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🎯 Pipeline</button>
           <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
+          <button onClick={() => loadDocuments()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📁 Dokumenty</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
           <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
         </div>
@@ -1738,6 +1767,148 @@ export default function Admin() {
               <button onClick={saveReservation} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               {reservationForm.id && <button onClick={() => deleteReservation(reservationForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
               <button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+
+        {/* DOKUMENTY */}
+        {!loading && view === "documents" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Dokumenty ({documents.length})</div>
+              <button onClick={() => { setDocumentForm({}); setView("editDocument"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nahrát dokument</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <input type="text" placeholder="Hledat dokument..." value={documentSearch} onChange={e => setDocumentSearch(e.target.value)}
+                style={{ flex: 1, padding: "8px 14px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fff" }} />
+              {["all", "presentation", "drawing", "permit", "contract", "photo", "other"].map(f => (
+                <button key={f} onClick={() => setDocumentFilter(f)} style={{
+                  padding: "5px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer",
+                  border: "0.5px solid #ddd",
+                  background: documentFilter === f ? "#1D9E75" : "#fff",
+                  color: documentFilter === f ? "#fff" : "#555",
+                }}>
+                  {{"all": "Vše", "presentation": "Prezentace", "drawing": "Výkresy", "permit": "Povolení", "contract": "Smlouvy", "photo": "Fotky", "other": "Ostatní"}[f]}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              {documents.filter(d => {
+                if (documentFilter !== "all" && d.type !== documentFilter) return false;
+                if (documentSearch && !d.name.toLowerCase().includes(documentSearch.toLowerCase())) return false;
+                return true;
+              }).map(d => {
+                const isPdf = d.file_name?.toLowerCase().endsWith(".pdf");
+                const isImage = ["jpg", "jpeg", "png", "webp"].some(ext => d.file_name?.toLowerCase().endsWith(ext));
+                return (
+                  <div key={d.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, overflow: "hidden" }}>
+                    {isImage ? (
+                      <img src={d.url} alt={d.name} style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ height: 80, background: "#f4f7fc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>
+                        {isPdf ? "📄" : "📁"}
+                      </div>
+                    )}
+                    <div style={{ padding: "10px 12px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>{d.name}</div>
+                      <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>
+                        {d.projects?.name && `🏗 ${d.projects.name}`}
+                        {d.units?.unit_number && ` · Byt č. ${d.units.unit_number}`}
+                        {d.contacts?.name && ` · 👤 ${d.contacts.name}`}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: d.is_public ? "#E1F5EE" : "#f0f0f0", color: d.is_public ? "#0F6E56" : "#666" }}>
+                          {d.is_public ? "Veřejný" : "Interní"}
+                        </span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#1A3A6B", textDecoration: "none" }}>👁 Náhled</a>
+                          <button onClick={() => { setDocumentForm(d); setView("editDocument"); }} style={{ background: "none", border: "none", fontSize: 12, color: "#666", cursor: "pointer" }}>✏️</button>
+                          <button onClick={() => deleteDocument(d.id, d.url)} style={{ background: "none", border: "none", fontSize: 12, color: "#E24B4A", cursor: "pointer" }}>×</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {documents.length === 0 && <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#aaa", padding: 40 }}>Žádné dokumenty.</div>}
+            </div>
+          </>
+        )}
+
+        {/* EDIT DOKUMENT */}
+        {!loading && view === "editDocument" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <button onClick={() => { setView("documents"); setDocumentForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Dokumenty</button>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{documentForm.id ? "Upravit dokument" : "Nahrát dokument"}</div>
+
+            {!documentForm.id && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Soubor</label>
+                <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dwg,.zip" onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const fileName = `docs/${Date.now()}-${file.name}`;
+                  const { error } = await supabase.storage.from("documents").upload(fileName, file);
+                  if (!error) {
+                    const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName);
+                    setDocumentForm(f => ({ ...f, url: urlData.publicUrl, file_name: file.name, file_size: file.size, name: f.name || file.name }));
+                  }
+                }} style={{ marginTop: 6, fontSize: 13, display: "block" }} />
+                {documentForm.url && <div style={{ fontSize: 12, color: "#1D9E75", marginTop: 6 }}>✓ Soubor nahrán: {documentForm.file_name}</div>}
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Název dokumentu *</label>
+                <input type="text" value={documentForm.name || ""} onChange={e => setDocumentForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Typ dokumentu</label>
+                <select value={documentForm.type || "other"} onChange={e => setDocumentForm(f => ({ ...f, type: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="presentation">Projektová prezentace</option>
+                  <option value="drawing">Výkres / půdorys</option>
+                  <option value="permit">Stavební povolení</option>
+                  <option value="contract">Smlouva</option>
+                  <option value="reservation_contract">Rezervační smlouva</option>
+                  <option value="purchase_contract">Kupní smlouva</option>
+                  <option value="photo">Fotky ze stavby</option>
+                  <option value="visualization">Vizualizace</option>
+                  <option value="price_list">Cenový list</option>
+                  <option value="analysis">Konkurenční analýza</option>
+                  <option value="technical">Technická dokumentace</option>
+                  <option value="other">Ostatní</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Přiřadit k projektu</label>
+                <select value={documentForm.project_id || ""} onChange={e => setDocumentForm(f => ({ ...f, project_id: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez projektu --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Přiřadit ke kontaktu</label>
+                <select value={documentForm.contact_id || ""} onChange={e => setDocumentForm(f => ({ ...f, contact_id: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez kontaktu --</option>
+                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 20 }}>
+                <input type="checkbox" checked={documentForm.is_public || false} onChange={e => setDocumentForm(f => ({ ...f, is_public: e.target.checked }))} style={{ accentColor: "#1D9E75" }} />
+                <label style={{ fontSize: 13, color: "#1a1a1a" }}>Veřejný dokument (viditelný zákazníkům)</label>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveDocument} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+              <button onClick={() => { setView("documents"); setDocumentForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
         )}
