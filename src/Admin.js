@@ -384,11 +384,21 @@ export default function Admin() {
   };
 
   const saveReservation = async () => {
-    if (reservationForm.id) { await supabase.from("reservations").update(reservationForm).eq("id", reservationForm.id); }
-    else { await supabase.from("reservations").insert(reservationForm); }
+    if (reservationForm.id) {
+      await supabase.from("reservations").update(reservationForm).eq("id", reservationForm.id);
+    } else {
+      await supabase.from("reservations").insert(reservationForm);
+      if (reservationForm.unit_id) {
+        await supabase.from("units").update({ status: "reserved" }).eq("id", reservationForm.unit_id);
+      }
+    }
     setReservationForm({});
     await Promise.all([loadReservationsData(), loadLeadsData(), loadContactsData(), loadProjects()]);
-    setView("reservations");
+    if (selectedProject) {
+      await loadUnits(selectedProject);
+    } else {
+      setView("reservations");
+    }
   };
 
   const deleteReservation = async (id) => {
@@ -1582,6 +1592,18 @@ export default function Admin() {
             <button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Rezervace</button>
             <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{reservationForm.id ? "Upravit rezervaci" : "Nová rezervace"}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {reservationForm.unit_id && (() => {
+                const unit = selectedProject?.units?.find(u => u.id === reservationForm.unit_id);
+                return unit ? (
+                  <div style={{ gridColumn: "1 / -1", background: "#E1F5EE", borderRadius: 10, padding: "12px 16px", marginBottom: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0F6E56" }}>Rezervace bytu</div>
+                    <div style={{ fontSize: 13, color: "#0F6E56", marginTop: 4 }}>
+                      Byt č. {unit.unit_number} · {unit.disp} · {unit.area} m² · {unit.floor}. patro
+                      {unit.price_net ? ` · ${unit.price_net.toLocaleString("cs-CZ")} Kč` : ""}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt *</label>
                 <select value={reservationForm.contact_id || ""} onChange={e => setReservationForm(f => ({ ...f, contact_id: e.target.value }))}
