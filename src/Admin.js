@@ -396,12 +396,13 @@ export default function Admin() {
   };
 
   const saveReservation = async () => {
-    if (reservationForm.id) {
-      await supabase.from("reservations").update(reservationForm).eq("id", reservationForm.id);
+    const { _project_id, _project_units, ...cleanForm } = reservationForm;
+    if (cleanForm.id) {
+      await supabase.from("reservations").update(cleanForm).eq("id", cleanForm.id);
     } else {
-      await supabase.from("reservations").insert(reservationForm);
-      if (reservationForm.unit_id) {
-        await supabase.from("units").update({ status: "reserved" }).eq("id", reservationForm.unit_id);
+      await supabase.from("reservations").insert(cleanForm);
+      if (cleanForm.unit_id) {
+        await supabase.from("units").update({ status: "reserved" }).eq("id", cleanForm.unit_id);
       }
     }
     setReservationForm({});
