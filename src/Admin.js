@@ -1140,6 +1140,28 @@ export default function Admin() {
               </div>
             </Section>
 
+            <Section title="Půdorys jednotky">
+              <div style={{ gridColumn: "1 / -1" }}>
+                <input type="file" accept="image/*,.pdf" onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const fileName = `floorplans/${Date.now()}-${file.name}`;
+                  const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+                  if (!error) {
+                    const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
+                    setUnitForm(f => ({ ...f, floor_plan: urlData.publicUrl }));
+                  }
+                }} style={{ fontSize: 13 }} />
+                {unitForm.floor_plan && (
+                  <div style={{ marginTop: 10, position: "relative", display: "inline-block" }}>
+                    <img src={unitForm.floor_plan} alt="Půdorys" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, border: "0.5px solid #ddd" }} />
+                    <button onClick={() => setUnitForm(f => ({ ...f, floor_plan: null }))}
+                      style={{ position: "absolute", top: 4, right: 4, background: "#E24B4A", color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, fontSize: 12, cursor: "pointer" }}>×</button>
+                  </div>
+                )}
+              </div>
+            </Section>
+
             <Section title="Stav a obchod">
               <Select label="Stav jednotky" field="status" options={["available", "reserved", "sold", "blocked", "withdrawn"]} obj={unitForm} setObj={setUnitForm} />
               <Input label="Kupující / zájemce" field="buyer" obj={unitForm} setObj={setUnitForm} />

@@ -398,6 +398,14 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
                     </div>
                   ) : null;
                 })()}
+                {selectedUnit.floor_plan && (
+                  <div>
+                    <div style={{ fontSize: 12, color: "#8899AA", marginBottom: 6 }}>Půdorys</div>
+                    <img src={selectedUnit.floor_plan} alt="Půdorys"
+                      onClick={() => setLightbox({ images: [selectedUnit.floor_plan], index: 0 })}
+                      style={{ width: "100%", borderRadius: 8, objectFit: "contain", cursor: "zoom-in", border: "1px solid #E8EDF5" }} />
+                  </div>
+                )}
                 {selectedUnit.status === "available" && (
                   <>
                     <button onClick={() => onReserve(project, selectedUnit)} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
