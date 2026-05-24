@@ -138,6 +138,9 @@ export default function Admin() {
   const [tasks, setTasks] = useState([]);
   const [taskForm, setTaskForm] = useState({});
   const [taskFilter, setTaskFilter] = useState("today");
+  const [aiResult, setAiResult] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSelectedProject, setAiSelectedProject] = useState("");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -316,6 +319,32 @@ export default function Admin() {
       await supabase.from("tasks").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", id);
     }
     loadTasks();
+  };
+
+  const callAI = async (prompt) => {
+    setAiLoading(true);
+    setAiResult("");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await res.json();
+      setAiResult(data.content[0].text);
+    } catch (err) {
+      setAiResult("Chyba: " + err.message);
+    }
+    setAiLoading(false);
   };
 
   const dismissAlert = async (key) => {
@@ -604,6 +633,7 @@ export default function Admin() {
           <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
           <button onClick={() => loadDocuments()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📁 Dokumenty</button>
           <button onClick={() => loadTasks()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>✅ Úkoly</button>
+          <button onClick={() => setView("ai")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🤖 AI asistent</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
           {currentUser?.role === "admin" && (
             <button onClick={() => { loadAdminUsers(); setView("users"); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👤 Uživatelé</button>
@@ -2321,6 +2351,162 @@ export default function Admin() {
               <button onClick={() => { setView("tasks"); setTaskForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
+        )}
+
+        {/* AI ASISTENT */}
+        {!loading && view === "ai" && (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>🤖 AI Asistent</div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Vyberte projekt</label>
+              <select value={aiSelectedProject} onChange={e => { setAiSelectedProject(e.target.value); setAiResult(""); }}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", maxWidth: 400 }}>
+                <option value="">-- vyberte projekt --</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
+              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: 16, marginBottom: 8 }}>📊</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Investor report</div>
+                <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>AI vygeneruje profesionální shrnutí projektu pro investory včetně klíčových metrik.</div>
+                <button onClick={async () => {
+                  if (!aiSelectedProject) { alert("Vyberte projekt"); return; }
+                  const p = projects.find(pr => pr.id === aiSelectedProject);
+                  const avail = p.total_units - p.sold_units;
+                  const pct = p.total_units > 0 ? Math.round((p.sold_units / p.total_units) * 100) : 0;
+                  await callAI(`Jsi expert na realitní trh v ČR. Vygeneruj profesionální investor report pro projekt:
+
+Název: ${p.name}
+Lokalita: ${p.location}
+Adresa: ${p.address}
+Typ: ${p.type}
+Dokončení: ${p.completion}
+Celkem bytů: ${p.total_units}
+Prodáno: ${p.sold_units} (${pct}%)
+Volných: ${avail}
+Cena od: ${p.price_from?.toLocaleString("cs-CZ")} Kč
+Popis: ${p.description || ""}
+
+Report by měl obsahovat:
+1. Executive summary (2-3 věty)
+2. Klíčové parametry projektu
+3. Prodejní progress a výhled
+4. Silné stránky projektu
+5. Doporučení
+
+Piš v češtině, profesionálně, stručně.`);
+                }} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", width: "100%", fontWeight: 500 }}>
+                  Generovat report
+                </button>
+              </div>
+
+              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: 16, marginBottom: 8 }}>🔍</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Kontrola dat</div>
+                <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>AI zkontroluje kompletnost dat projektu a bytů a upozorní na chybějící informace.</div>
+                <button onClick={async () => {
+                  if (!aiSelectedProject) { alert("Vyberte projekt"); return; }
+                  const p = projects.find(pr => pr.id === aiSelectedProject);
+                  const { data: unitData } = await supabase.from("units").select("*").eq("project_id", aiSelectedProject);
+                  const units = unitData || [];
+                  const missingProjectFields = [];
+                  if (!p.description) missingProjectFields.push("popis projektu");
+                  if (!p.address) missingProjectFields.push("adresa");
+                  if (!p.completion) missingProjectFields.push("datum dokončení");
+                  if (!p.lat || !p.lng) missingProjectFields.push("poloha na mapě");
+                  if (!p.company_logo) missingProjectFields.push("logo firmy");
+
+                  const unitIssues = units.map(u => {
+                    const issues = [];
+                    if (!u.price_net) issues.push("cena");
+                    if (!u.area) issues.push("plocha");
+                    if (!u.floor) issues.push("patro");
+                    if (!u.disp) issues.push("dispozice");
+                    if (!u.images || u.images.length === 0) issues.push("fotky");
+                    if (!u.floor_plan) issues.push("půdorys");
+                    return issues.length > 0 ? `Byt č.${u.unit_number}: chybí ${issues.join(", ")}` : null;
+                  }).filter(Boolean);
+
+                  await callAI(`Jsi QA expert na realitní CRM systémy. Zkontroluj data projektu a navrhni co zlepšit:
+
+PROJEKT: ${p.name}
+Chybějící pole projektu: ${missingProjectFields.length > 0 ? missingProjectFields.join(", ") : "vše vyplněno"}
+Počet bytů: ${units.length}
+Byty s problémy: ${unitIssues.length > 0 ? "\n" + unitIssues.slice(0, 10).join("\n") : "žádné problémy"}
+${unitIssues.length > 10 ? `... a ${unitIssues.length - 10} dalších` : ""}
+
+Prodejní progress: ${p.sold_units}/${p.total_units} prodáno
+
+Napiš stručnou zprávu o kvalitě dat a konkrétní doporučení co doplnit pro lepší prodejnost. Piš v češtině.`);
+                }} style={{ background: "#0F6E56", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", width: "100%", fontWeight: 500 }}>
+                  Zkontrolovat data
+                </button>
+              </div>
+
+              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: 16, marginBottom: 8 }}>💰</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Doporučení ceny</div>
+                <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>AI analyzuje ceny projektu a porovná je s trhem v dané lokalitě.</div>
+                <button onClick={async () => {
+                  if (!aiSelectedProject) { alert("Vyberte projekt"); return; }
+                  const p = projects.find(pr => pr.id === aiSelectedProject);
+                  const { data: unitData } = await supabase.from("units").select("disp, area, price_net, price_per_sqm, status").eq("project_id", aiSelectedProject);
+                  const units = unitData || [];
+                  const avgPrice = units.filter(u => u.price_per_sqm).reduce((s, u, _, a) => s + u.price_per_sqm / a.length, 0);
+                  const byDisp = {};
+                  units.forEach(u => {
+                    if (!byDisp[u.disp]) byDisp[u.disp] = [];
+                    if (u.price_per_sqm) byDisp[u.disp].push(u.price_per_sqm);
+                  });
+
+                  await callAI(`Jsi expert na oceňování nemovitostí v ČR. Analyzuj ceny projektu a poskytni doporučení:
+
+PROJEKT: ${p.name}
+Lokalita: ${p.location}
+Typ: ${p.type}
+Dokončení: ${p.completion}
+
+AKTUÁLNÍ CENY:
+Průměrná cena/m²: ${Math.round(avgPrice).toLocaleString("cs-CZ")} Kč
+${Object.entries(byDisp).map(([disp, prices]) => `${disp}: průměr ${Math.round(prices.reduce((a, b) => a + b, 0) / prices.length).toLocaleString("cs-CZ")} Kč/m²`).join("\n")}
+
+Na základě aktuálního trhu v lokalitě ${p.location} v roce 2025-2026:
+1. Zhodnoť zda jsou ceny přiměřené trhu
+2. Doporuč optimální cenové rozmezí pro každou dispozici
+3. Navrhni cenovou strategii pro zbývající byty
+4. Upozorni na příležitosti nebo rizika
+
+Piš konkrétně s čísly, v češtině.`);
+                }} style={{ background: "#7A4A0A", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", width: "100%", fontWeight: 500 }}>
+                  Analyzovat ceny
+                </button>
+              </div>
+            </div>
+
+            {(aiLoading || aiResult) && (
+              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 20 }}>
+                {aiLoading ? (
+                  <div style={{ textAlign: "center", color: "#aaa", padding: 20 }}>
+                    <div style={{ fontSize: 24, marginBottom: 8 }}>🤖</div>
+                    <div>AI analyzuje data...</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Výsledek analýzy</div>
+                      <button onClick={() => navigator.clipboard.writeText(aiResult)} style={{ background: "#f0f0f0", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 12, cursor: "pointer" }}>
+                        📋 Kopírovat
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#333", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{aiResult}</div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {/* NASTAVENÍ */}
