@@ -20,6 +20,8 @@ export default function Admin() {
   const [view, setView] = useState("projects");
   const [selectedProject, setSelectedProject] = useState(null);
   const [filterDisp, setFilterDisp] = useState("Vše");
+  const [milestones, setMilestones] = useState([]);
+  const [milestoneForm, setMilestoneForm] = useState({});
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -154,6 +156,30 @@ export default function Admin() {
     loadUnits(selectedProject);
   };
 
+  const loadMilestones = async (project) => {
+    const { data } = await supabase.from("milestones").select("*").eq("project_id", project.id).order("order_index");
+    setMilestones(data || []);
+    setSelectedProject(project);
+    setView("milestones");
+  };
+
+  const saveMilestone = async () => {
+    if (milestoneForm.id) {
+      await supabase.from("milestones").update(milestoneForm).eq("id", milestoneForm.id);
+    } else {
+      const maxOrder = milestones.length > 0 ? Math.max(...milestones.map(m => m.order_index)) + 1 : 0;
+      await supabase.from("milestones").insert({ ...milestoneForm, project_id: selectedProject.id, order_index: maxOrder });
+    }
+    setMilestoneForm({});
+    loadMilestones(selectedProject);
+  };
+
+  const deleteMilestone = async (id) => {
+    if (!window.confirm("Smazat milník?")) return;
+    await supabase.from("milestones").delete().eq("id", id);
+    loadMilestones(selectedProject);
+  };
+
   const Input = ({ label, field, type, obj, setObj, span }) => {
     const [localVal, setLocalVal] = useState(obj[field] || "");
     return (
@@ -264,6 +290,7 @@ export default function Admin() {
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => { setFilterDisp("Vše"); loadUnits(p); }} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
+                    <button onClick={() => loadMilestones(p)} style={{ background: "#EEF3FA", color: "#1A3A6B", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Timeline</button>
                     <button onClick={() => { setForm(p); setView("editProject"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
                     <button onClick={() => deleteProject(p.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
                   </div>
@@ -706,6 +733,159 @@ export default function Admin() {
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveUnit} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("units"); setUnitForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+
+        {/* TIMELINE */}
+        {!loading && view === "milestones" && selectedProject && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>{selectedProject.name} — Timeline</div>
+              </div>
+              <button onClick={() => { setMilestoneForm({}); setView("editMilestone"); }} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový milník</button>
+            </div>
+
+            {/* Ganttův diagram */}
+            {milestones.length > 0 && (() => {
+              const allDates = milestones.flatMap(m => [m.date_from, m.date_to].filter(Boolean)).map(d => new Date(d));
+              const minDate = new Date(Math.min(...allDates));
+              const maxDate = new Date(Math.max(...allDates));
+              const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 1);
+              const statusColors = { inactive: "#e0e0e0", active: "#1D9E75", done: "#0F6E56", delayed: "#E24B4A" };
+              const statusLabels = { inactive: "Neaktivní", active: "Probíhá", done: "Hotovo", delayed: "Zpožděno" };
+
+              return (
+                <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 20, marginBottom: 16, overflowX: "auto" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 14 }}>Ganttův diagram</div>
+                  <div style={{ minWidth: 600 }}>
+                    {milestones.map(m => {
+                      if (!m.date_from || !m.date_to) return null;
+                      const start = (new Date(m.date_from) - minDate) / (1000 * 60 * 60 * 24);
+                      const duration = (new Date(m.date_to) - new Date(m.date_from)) / (1000 * 60 * 60 * 24);
+                      const left = (start / totalDays) * 100;
+                      const width = Math.max((duration / totalDays) * 100, 1);
+                      const color = statusColors[m.status] || "#e0e0e0";
+                      const today = new Date();
+                      const isDelayed = m.status !== "done" && new Date(m.date_to) < today;
+
+                      return (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 10 }}>
+                          <div style={{ width: 160, fontSize: 11, color: "#333", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+                          <div style={{ flex: 1, height: 24, background: "#f4f4f4", borderRadius: 4, position: "relative" }}>
+                            <div style={{
+                              position: "absolute", left: `${left}%`, width: `${width}%`,
+                              height: "100%", background: isDelayed ? "#E24B4A" : color,
+                              borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 6,
+                              minWidth: 4,
+                            }}>
+                              {width > 8 && <span style={{ fontSize: 9, color: "#fff", whiteSpace: "nowrap" }}>{m.date_from} – {m.date_to}</span>}
+                            </div>
+                          </div>
+                          <div style={{ width: 80, fontSize: 10, color: "#888", flexShrink: 0 }}>{statusLabels[m.status] || m.status}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
+                    {Object.entries({ inactive: "Neaktivní", active: "Probíhá", done: "Hotovo", delayed: "Zpožděno" }).map(([k, v]) => (
+                      <div key={k} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" }}>
+                        <div style={{ width: 12, height: 12, borderRadius: 2, background: { inactive: "#e0e0e0", active: "#1D9E75", done: "#0F6E56", delayed: "#E24B4A" }[k] }} />
+                        {v}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Seznam milníků */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {milestones.map(m => {
+                const today = new Date();
+                const isDelayed = m.status !== "done" && m.date_to && new Date(m.date_to) < today;
+                const isSoon = m.status !== "done" && m.date_to && new Date(m.date_to) - today < 30 * 24 * 60 * 60 * 1000;
+                return (
+                  <div key={m.id} style={{ background: "#fff", border: `0.5px solid ${isDelayed ? "#E24B4A" : "#e8e8e8"}`, borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{m.name}</div>
+                        {isDelayed && <span style={{ fontSize: 10, background: "#FCEBEB", color: "#A32D2D", padding: "2px 8px", borderRadius: 20 }}>Zpožděno</span>}
+                        {isSoon && !isDelayed && <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>Blíží se</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
+                        {m.date_from} – {m.date_to}
+                        {m.responsible && ` · 👤 ${m.responsible}`}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <select value={m.status} onChange={async e => {
+                        await supabase.from("milestones").update({ status: e.target.value }).eq("id", m.id);
+                        loadMilestones(selectedProject);
+                      }} style={{ padding: "5px 8px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 12, background: "#fafafa" }}>
+                        <option value="inactive">Neaktivní</option>
+                        <option value="active">Probíhá</option>
+                        <option value="done">Hotovo</option>
+                        <option value="delayed">Zpožděno</option>
+                      </select>
+                      <button onClick={() => { setMilestoneForm(m); setView("editMilestone"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                      <button onClick={() => deleteMilestone(m.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {milestones.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné milníky. Přidejte první.</div>}
+            </div>
+          </>
+        )}
+
+        {/* EDIT MILESTONE */}
+        {!loading && view === "editMilestone" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <button onClick={() => { setView("milestones"); setMilestoneForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Timeline</button>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{milestoneForm.id ? "Upravit milník" : "Nový milník"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Název milníku *</label>
+                <input type="text" value={milestoneForm.name || ""} onChange={e => setMilestoneForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Datum od</label>
+                <input type="date" value={milestoneForm.date_from || ""} onChange={e => setMilestoneForm(f => ({ ...f, date_from: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Datum do</label>
+                <input type="date" value={milestoneForm.date_to || ""} onChange={e => setMilestoneForm(f => ({ ...f, date_to: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Odpovědná osoba</label>
+                <input type="text" value={milestoneForm.responsible || ""} onChange={e => setMilestoneForm(f => ({ ...f, responsible: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
+                <select value={milestoneForm.status || "inactive"} onChange={e => setMilestoneForm(f => ({ ...f, status: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="inactive">Neaktivní</option>
+                  <option value="active">Probíhá</option>
+                  <option value="done">Hotovo</option>
+                  <option value="delayed">Zpožděno</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
+                <textarea value={milestoneForm.notes || ""} onChange={e => setMilestoneForm(f => ({ ...f, notes: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveMilestone} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+              <button onClick={() => { setView("milestones"); setMilestoneForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
         )}
