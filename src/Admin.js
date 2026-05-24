@@ -387,8 +387,7 @@ export default function Admin() {
     if (reservationForm.id) { await supabase.from("reservations").update(reservationForm).eq("id", reservationForm.id); }
     else { await supabase.from("reservations").insert(reservationForm); }
     setReservationForm({});
-    await loadReservationsData();
-    await loadProjects();
+    await Promise.all([loadReservationsData(), loadLeadsData(), loadContactsData(), loadProjects()]);
     setView("reservations");
   };
 
@@ -482,7 +481,13 @@ export default function Admin() {
       <div style={{ background: "#04342C", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>🏗 Admin panel</div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button onClick={() => setView("dashboard")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📊 Dashboard</button>
+          <button onClick={async () => {
+            await loadReservationsData();
+            await loadLeadsData();
+            await loadContactsData();
+            await loadProjects();
+            setView("dashboard");
+          }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📊 Dashboard</button>
           <button onClick={() => { loadContacts(); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👥 Kontakty</button>
           <button onClick={() => loadLeads()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🎯 Pipeline</button>
           <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
