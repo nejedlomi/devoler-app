@@ -155,6 +155,101 @@ function ImageGallery({ images }) {
   );
 }
 
+function ProjectDocuments({ projectId }) {
+  const [projDocs, setProjDocs] = useState([]);
+
+  useEffect(() => {
+    supabase.from("documents").select("*").eq("project_id", projectId).eq("is_public", true).then(({ data }) => setProjDocs(data || []));
+  }, [projectId]);
+
+  if (projDocs.length === 0) return null;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", marginBottom: 20, boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#0D2137", marginBottom: 12 }}>📁 Dokumenty ke stažení</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {projDocs.map(d => {
+          const isPdf = d.file_name?.toLowerCase().endsWith(".pdf");
+          const isImage = ["jpg", "jpeg", "png", "webp"].some(ext => d.file_name?.toLowerCase().endsWith(ext));
+          return (
+            <a key={d.id} href={d.url} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#F4F7FC", borderRadius: 10, textDecoration: "none", color: "#0D2137", transition: "background 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#E8EDF5"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#F4F7FC"; }}
+            >
+              <span style={{ fontSize: 20 }}>{isImage ? "🖼" : isPdf ? "📄" : "📁"}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{d.name}</div>
+                <div style={{ fontSize: 11, color: "#8899AA", marginTop: 2 }}>
+                  {{"presentation": "Prezentace", "drawing": "Výkres", "permit": "Povolení", "contract": "Smlouva", "photo": "Foto", "visualization": "Vizualizace", "price_list": "Ceník", "technical": "Technická dokumentace", "other": "Dokument"}[d.type] || "Dokument"}
+                </div>
+              </div>
+              <span style={{ fontSize: 12, color: "#1A3A6B", fontWeight: 500 }}>Stáhnout →</span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MortgageCalculator({ unit }) {
+  const [showCalc, setShowCalc] = useState(false);
+  const [deposit, setDeposit] = useState(20);
+  const [years, setYears] = useState(30);
+  const [rate, setRate] = useState(4.5);
+  const price = unit.price_net || unit.price || 0;
+  const loanAmount = price * (1 - deposit / 100);
+  const monthlyRate = rate / 100 / 12;
+  const payments = years * 12;
+  const monthly = monthlyRate > 0 ? Math.round(loanAmount * monthlyRate / (1 - Math.pow(1 + monthlyRate, -payments))) : 0;
+
+  return (
+    <div>
+      <button onClick={() => setShowCalc(s => !s)} style={{ width: "100%", background: "#F4F7FC", color: "#1A3A6B", border: "1px solid #E8EDF5", borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 8 }}>
+        🏦 {showCalc ? "Skrýt" : "Kalkulačka hypotéky"}
+      </button>
+      {showCalc && (
+        <div style={{ background: "#F4F7FC", borderRadius: 10, padding: 14, marginTop: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8899AA", marginBottom: 4 }}>
+                <span>Vlastní záloha</span>
+                <span style={{ fontWeight: 600, color: "#0D2137" }}>{deposit}% — {Math.round(price * deposit / 100).toLocaleString("cs-CZ")} Kč</span>
+              </div>
+              <input type="range" min="10" max="90" value={deposit} onChange={e => setDeposit(parseInt(e.target.value))}
+                style={{ width: "100%", accentColor: "#1A3A6B" }} />
+            </div>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8899AA", marginBottom: 4 }}>
+                <span>Doba splácení</span>
+                <span style={{ fontWeight: 600, color: "#0D2137" }}>{years} let</span>
+              </div>
+              <input type="range" min="5" max="30" value={years} onChange={e => setYears(parseInt(e.target.value))}
+                style={{ width: "100%", accentColor: "#1A3A6B" }} />
+            </div>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8899AA", marginBottom: 4 }}>
+                <span>Úroková sazba</span>
+                <span style={{ fontWeight: 600, color: "#0D2137" }}>{rate}%</span>
+              </div>
+              <input type="range" min="1" max="10" step="0.1" value={rate} onChange={e => setRate(parseFloat(e.target.value))}
+                style={{ width: "100%", accentColor: "#1A3A6B" }} />
+            </div>
+            <div style={{ borderTop: "1px solid #E8EDF5", paddingTop: 10 }}>
+              <div style={{ fontSize: 11, color: "#8899AA", marginBottom: 4 }}>Výše úvěru: {Math.round(loanAmount).toLocaleString("cs-CZ")} Kč</div>
+              <div style={{ fontSize: 11, color: "#8899AA", marginBottom: 8 }}>Celkem zaplaceno: {Math.round(monthly * payments).toLocaleString("cs-CZ")} Kč</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "#8899AA" }}>Měsíční splátka</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#1A3A6B" }}>{monthly.toLocaleString("cs-CZ")} Kč</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
   const [units, setUnits] = useState([]);
   const [floor, setFloor] = useState(1);
@@ -210,6 +305,8 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
             <div style={{ fontSize: 14, color: "#445566", lineHeight: 1.7 }}>{project.description}</div>
           </div>
         )}
+
+        <ProjectDocuments projectId={project.id} />
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 16 }}>
           <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
@@ -279,9 +376,12 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
                   ) : null;
                 })()}
                 {selectedUnit.status === "available" && (
-                  <button onClick={() => onReserve(project, selectedUnit)} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                    Rezervovat byt
-                  </button>
+                  <>
+                    <button onClick={() => onReserve(project, selectedUnit)} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      Rezervovat byt
+                    </button>
+                    <MortgageCalculator unit={selectedUnit} />
+                  </>
                 )}
                 {selectedUnit.status === "reserved" && (
                   <div style={{ background: "#FEF3E2", borderRadius: 10, padding: 12, fontSize: 13, color: "#7A4A0A", textAlign: "center" }}>Byt je rezervován.</div>
