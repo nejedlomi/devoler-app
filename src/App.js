@@ -79,6 +79,22 @@ function ProjectCard({ project, onClick }) {
           </div>
         </div>
 
+        {project.units && project.units.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {["1+kk", "2+kk", "3+kk", "4+kk"].map(disp => {
+              const total = project.units.filter(u => u.disp === disp).length;
+              const avail = project.units.filter(u => u.disp === disp && u.status === "available").length;
+              if (total === 0) return null;
+              return (
+                <div key={disp} style={{ background: "#F4F7FC", borderRadius: 8, padding: "5px 10px", fontSize: 11 }}>
+                  <span style={{ fontWeight: 700, color: "#0D2137" }}>{disp}</span>
+                  <span style={{ color: "#8899AA", marginLeft: 4 }}>{avail}/{total}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div style={{ marginBottom: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#8899AA", marginBottom: 5 }}>
             <span>Prodáno {pct}%</span>
@@ -422,7 +438,7 @@ export default function App() {
   useEffect(() => {
     const load = async () => {
       const [{ data: projectsData }, { data: settingsData }] = await Promise.all([
-        supabase.from("projects").select("*").order("created_at"),
+        supabase.from("projects").select("*, units(disp, status)").order("created_at"),
         supabase.from("settings").select("*"),
       ]);
       setProjects(projectsData || []);

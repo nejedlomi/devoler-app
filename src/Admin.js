@@ -368,6 +368,37 @@ export default function Admin() {
               </div>
             </div>
 
+            <div style={{ marginTop: 16, padding: 14, background: "#f7f7f5", borderRadius: 10, border: "0.5px solid #e8e8e8" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 10 }}>🏠 Generovat byty automaticky</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 10 }}>
+                {["1+kk", "2+kk", "3+kk", "4+kk"].map(disp => (
+                  <div key={disp} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{disp}</label>
+                    <input type="number" min="0" defaultValue="0" id={`gen-${disp}`}
+                      style={{ padding: "7px 10px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fff" }} />
+                  </div>
+                ))}
+              </div>
+              <button onClick={async () => {
+                if (!form.id) { alert("Nejdříve uložte projekt!"); return; }
+                const dispozice = ["1+kk", "2+kk", "3+kk", "4+kk"];
+                const units = [];
+                let counter = 1;
+                for (const disp of dispozice) {
+                  const count = parseInt(document.getElementById(`gen-${disp}`)?.value) || 0;
+                  for (let i = 0; i < count; i++) {
+                    units.push({ project_id: form.id, unit_number: counter++, disp, status: "available", floor: 1, area: 0, price: 0 });
+                  }
+                }
+                if (units.length === 0) { alert("Zadejte počty bytů!"); return; }
+                if (!window.confirm(`Vytvořit ${units.length} bytů?`)) return;
+                await supabase.from("units").insert(units);
+                alert(`Vytvořeno ${units.length} bytů!`);
+              }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Generovat byty
+              </button>
+            </div>
+
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveProject} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("projects"); setForm({}); setSuggestions([]); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
@@ -382,6 +413,19 @@ export default function Admin() {
               <div>
                 <button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>{selectedProject.name} — Byty ({selectedProject.units?.length || 0})</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0" }}>
+                  {["1+kk", "2+kk", "3+kk", "4+kk"].map(disp => {
+                    const total = selectedProject.units?.filter(u => u.disp === disp).length || 0;
+                    const avail = selectedProject.units?.filter(u => u.disp === disp && u.status === "available").length || 0;
+                    if (total === 0) return null;
+                    return (
+                      <div key={disp} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "10px 16px", textAlign: "center" }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{disp}</div>
+                        <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{avail} volných / {total} celkem</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <button onClick={() => { setUnitForm({}); setView("editUnit"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový byt</button>
             </div>
