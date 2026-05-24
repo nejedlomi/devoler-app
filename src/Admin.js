@@ -25,6 +25,9 @@ export default function Admin() {
   const [filterPriceMax, setFilterPriceMax] = useState("");
   const [milestones, setMilestones] = useState([]);
   const [milestoneForm, setMilestoneForm] = useState({});
+  const [contacts, setContacts] = useState([]);
+  const [contactForm, setContactForm] = useState({});
+  const [contactSearch, setContactSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -183,6 +186,30 @@ export default function Admin() {
     loadMilestones(selectedProject);
   };
 
+  const loadContacts = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("contacts").select("*, projects(name), units(unit_number, disp)").order("created_at", { ascending: false });
+    setContacts(data || []);
+    setLoading(false);
+    setView("contacts");
+  };
+
+  const saveContact = async () => {
+    if (contactForm.id) {
+      await supabase.from("contacts").update(contactForm).eq("id", contactForm.id);
+    } else {
+      await supabase.from("contacts").insert(contactForm);
+    }
+    setContactForm({});
+    loadContacts();
+  };
+
+  const deleteContact = async (id) => {
+    if (!window.confirm("Smazat kontakt?")) return;
+    await supabase.from("contacts").delete().eq("id", id);
+    loadContacts();
+  };
+
   const Input = ({ label, field, type, obj, setObj, span }) => {
     const [localVal, setLocalVal] = useState(obj[field] || "");
     return (
@@ -268,6 +295,7 @@ export default function Admin() {
         <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>🏗 Admin panel</div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button onClick={() => setView("dashboard")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📊 Dashboard</button>
+          <button onClick={() => { loadContacts(); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👥 Kontakty</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
           <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
         </div>
@@ -984,6 +1012,102 @@ export default function Admin() {
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveMilestone} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("milestones"); setMilestoneForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+
+        {/* KONTAKTY */}
+        {!loading && view === "contacts" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Kontakty ({contacts.length})</div>
+              <button onClick={() => { setContactForm({}); setView("editContact"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový kontakt</button>
+            </div>
+
+            <input type="text" placeholder="Hledat kontakt..." value={contactSearch} onChange={e => setContactSearch(e.target.value)}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #ddd", fontSize: 13, marginBottom: 14, boxSizing: "border-box", background: "#fff" }} />
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {contacts.filter(c => !contactSearch || c.name?.toLowerCase().includes(contactSearch.toLowerCase()) || c.email?.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone?.includes(contactSearch)).map(c => {
+                const statusColors = { lead: { bg: "#EEF3FA", color: "#1A3A6B" }, interested: { bg: "#FAEEDA", color: "#633806" }, reserved: { bg: "#E1F5EE", color: "#0F6E56" }, buyer: { bg: "#0F6E56", color: "#fff" }, lost: { bg: "#f0f0f0", color: "#666" } };
+                const statusLabels = { lead: "Zájemce", interested: "Má zájem", reserved: "Rezervoval", buyer: "Kupující", lost: "Ztracen" };
+                const sc = statusColors[c.status] || statusColors.lead;
+                return (
+                  <div key={c.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{c.name}</div>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color, fontWeight: 500 }}>{statusLabels[c.status] || c.status}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999" }}>
+                        {c.phone && `📞 ${c.phone}`}
+                        {c.email && ` · ✉️ ${c.email}`}
+                        {c.projects?.name && ` · 🏗 ${c.projects.name}`}
+                        {c.units?.unit_number && ` · Byt č. ${c.units.unit_number} (${c.units.disp})`}
+                      </div>
+                      {c.note && <div style={{ fontSize: 12, color: "#aaa", marginTop: 4, fontStyle: "italic" }}>{c.note}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { setContactForm(c); setView("editContact"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                      <button onClick={() => deleteContact(c.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {contacts.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné kontakty.</div>}
+            </div>
+          </>
+        )}
+
+        {/* EDIT KONTAKT */}
+        {!loading && view === "editContact" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Kontakty</button>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{contactForm.id ? "Upravit kontakt" : "Nový kontakt"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Jméno a příjmení *</label>
+                <input type="text" value={contactForm.name || ""} onChange={e => setContactForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Telefon</label>
+                <input type="text" value={contactForm.phone || ""} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>E-mail</label>
+                <input type="email" value={contactForm.email || ""} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
+                <select value={contactForm.status || "lead"} onChange={e => setContactForm(f => ({ ...f, status: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="lead">Zájemce</option>
+                  <option value="interested">Má zájem</option>
+                  <option value="reserved">Rezervoval</option>
+                  <option value="buyer">Kupující</option>
+                  <option value="lost">Ztracen</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Projekt</label>
+                <select value={contactForm.project_id || ""} onChange={e => setContactForm(f => ({ ...f, project_id: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez projektu --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámka</label>
+                <textarea value={contactForm.note || ""} onChange={e => setContactForm(f => ({ ...f, note: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveContact} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+              <button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
         )}
