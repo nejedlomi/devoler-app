@@ -45,6 +45,68 @@ function PriceHistory({ unitId }) {
   );
 }
 
+function CommunicationLog({ contactId, supabase }) {
+  const [logs, setLogs] = useState([]);
+  const [newLog, setNewLog] = useState("");
+  const [logType, setLogType] = useState("note");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from("communication_log").select("*").eq("contact_id", contactId).order("created_at", { ascending: false });
+      setLogs(data || []);
+      setLoaded(true);
+    };
+    load();
+  }, [contactId]);
+
+  const addLog = async () => {
+    if (!newLog.trim()) return;
+    await supabase.from("communication_log").insert({ contact_id: contactId, type: logType, content: newLog });
+    setNewLog("");
+    const { data } = await supabase.from("communication_log").select("*").eq("contact_id", contactId).order("created_at", { ascending: false });
+    setLogs(data || []);
+  };
+
+  const typeIcon = { note: "📝", call: "📞", email: "✉️", meeting: "🤝", sms: "💬" };
+  const typeLabel = { note: "Poznámka", call: "Hovor", email: "E-mail", meeting: "Schůzka", sms: "SMS" };
+
+  return (
+    <div style={{ marginTop: 20, borderTop: "0.5px solid #eee", paddingTop: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 12 }}>Historie komunikace</div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <select value={logType} onChange={e => setLogType(e.target.value)}
+          style={{ padding: "8px 10px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa" }}>
+          {Object.entries(typeLabel).map(([val, lbl]) => <option key={val} value={val}>{typeIcon[val]} {lbl}</option>)}
+        </select>
+        <input type="text" value={newLog} onChange={e => setNewLog(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addLog()}
+          placeholder="Přidat záznam... (Enter pro uložení)"
+          style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa" }} />
+        <button onClick={addLog} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+          Přidat
+        </button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto" }}>
+        {logs.length === 0 && loaded && <div style={{ fontSize: 12, color: "#aaa", textAlign: "center", padding: 10 }}>Žádná komunikace.</div>}
+        {logs.map(l => (
+          <div key={l.id} style={{ background: "#f7f7f5", borderRadius: 8, padding: "8px 12px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 16 }}>{typeIcon[l.type] || "📝"}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: "#1a1a1a" }}>{l.content}</div>
+              <div style={{ fontSize: 10, color: "#aaa", marginTop: 3 }}>
+                {new Date(l.created_at).toLocaleDateString("cs-CZ")} {new Date(l.created_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })} · {l.created_by}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [authed, setAuthed] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
@@ -1324,6 +1386,7 @@ export default function Admin() {
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
               </div>
             </div>
+            {contactForm.id && <CommunicationLog contactId={contactForm.id} supabase={supabase} />}
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveContact} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
