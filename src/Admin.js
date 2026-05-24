@@ -34,7 +34,7 @@ export default function Admin() {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
-  useEffect(() => { loadProjects(); loadSettings(); }, []);
+  useEffect(() => { loadProjects(); loadSettings(); setView("dashboard"); }, []);
 
   useEffect(() => {
     if (view !== "editProject") {
@@ -264,6 +264,7 @@ export default function Admin() {
       <div style={{ background: "#04342C", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>🏗 Admin panel</div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={() => setView("dashboard")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📊 Dashboard</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
           <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
         </div>
@@ -272,6 +273,72 @@ export default function Admin() {
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}>
 
         {loading && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Načítám...</div>}
+
+        {/* DASHBOARD */}
+        {!loading && view === "dashboard" && (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>Dashboard</div>
+
+            {/* Statistiky */}
+            {(() => {
+              const totalUnits = projects.reduce((s, p) => s + (p.total_units || 0), 0);
+              const soldUnits = projects.reduce((s, p) => s + (p.sold_units || 0), 0);
+              const availUnits = totalUnits - soldUnits;
+              const totalVolume = projects.reduce((s, p) => s + (p.price_from || 0) * (p.total_units || 0), 0);
+
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+                  {[
+                    ["🏗", "Projekty", projects.length, "#1A3A6B"],
+                    ["🏠", "Celkem bytů", totalUnits, "#1D9E75"],
+                    ["✅", "Prodáno", soldUnits, "#0F6E56"],
+                    ["🔓", "Volných", availUnits, "#633806"],
+                  ].map(([icon, label, value, color]) => (
+                    <div key={label} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "18px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                      <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
+                      <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Projekty přehled */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+              {projects.map(p => {
+                const avail = p.total_units - p.sold_units;
+                const pct = p.total_units > 0 ? Math.round((p.sold_units / p.total_units) * 100) : 0;
+                const isSoon = p.total_units === 0;
+                return (
+                  <div key={p.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</div>
+                        <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>📍 {p.location}</div>
+                      </div>
+                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: isSoon ? "#FAEEDA" : avail === 0 ? "#f0f0f0" : "#E1F5EE", color: isSoon ? "#633806" : avail === 0 ? "#666" : "#0F6E56", fontWeight: 500 }}>
+                        {isSoon ? "Připravujeme" : avail === 0 ? "Vyprodáno" : `${avail} volných`}
+                      </span>
+                    </div>
+                    <div style={{ height: 6, background: "#f0f0f0", borderRadius: 3, marginBottom: 8 }}>
+                      <div style={{ height: 6, width: `${pct}%`, background: pct === 100 ? "#aaa" : "#1D9E75", borderRadius: 3 }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#999" }}>
+                      <span>Prodáno {pct}%</span>
+                      <span>Dokončení {p.completion}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                      <button onClick={() => loadUnits(p)} style={{ flex: 1, background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
+                      <button onClick={() => loadMilestones(p)} style={{ flex: 1, background: "#EEF3FA", color: "#1A3A6B", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}>Timeline</button>
+                      <button onClick={() => { setForm(p); setView("editProject"); }} style={{ flex: 1, background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {/* PROJEKTY */}
         {!loading && view === "projects" && (
