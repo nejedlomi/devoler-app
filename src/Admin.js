@@ -197,8 +197,9 @@ export default function Admin() {
   }[s] || s);
 
   const login = async () => {
-    const { data } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password).single();
-    if (data) { setAuthed(true); setLoginError(""); }
+    const { data, error } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password);
+    console.log("Login result:", data, error);
+    if (data && data.length > 0) { setAuthed(true); setLoginError(""); }
     else { setLoginError("Špatné jméno nebo heslo"); }
   };
 

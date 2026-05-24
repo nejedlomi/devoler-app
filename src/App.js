@@ -411,7 +411,13 @@ export default function App() {
     company_name: "DeveloperX",
     phone: "+420 777 000 000",
   });
-  const isAdmin = window.location.hash === "#admin";
+  const [isAdmin, setIsAdmin] = useState(window.location.hash === "#admin");
+
+  useEffect(() => {
+    const handler = () => setIsAdmin(window.location.hash === "#admin");
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -442,6 +448,7 @@ export default function App() {
           <span style={{ cursor: "pointer" }}>Reference</span>
           <span style={{ cursor: "pointer" }}>Kontakt</span>
           <button style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📞 {settings.phone}</button>
+          <a href="#admin" style={{ background: "rgba(255,255,255,0.1)", color: "#7AA8D8", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>Admin</a>
         </div>
       </div>
 
