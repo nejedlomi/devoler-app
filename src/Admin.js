@@ -581,16 +581,24 @@ export default function Admin() {
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
                   {[
-                    ["🏗", "Projekty", projects.length, "#1A3A6B"],
-                    ["🏠", "Celkem bytů", totalUnits, "#1D9E75"],
-                    ["✅", "Prodáno", soldUnits, "#0F6E56"],
-                    ["🔓", "Volných", availUnits, "#633806"],
-                    ["🎯", "Leads", leads.length, "#7A4A0A"],
-                    ["📋", "Rezervace", reservations.length, "#4A3A9A"],
-                    ["⚠️", "Expirující", reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).length, "#A32D2D"],
-                    ["👥", "Kontakty", contacts.length, "#0F6E56"],
-                  ].map(([icon, label, value, color]) => (
-                    <div key={label} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "18px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                    ["🏗", "Projekty", projects.length, "#1A3A6B", "projects"],
+                    ["🏠", "Celkem bytů", totalUnits, "#1D9E75", null],
+                    ["✅", "Prodáno", soldUnits, "#0F6E56", null],
+                    ["🔓", "Volných", availUnits, "#633806", null],
+                    ["🎯", "Leads", leads.length, "#7A4A0A", "leads"],
+                    ["📋", "Rezervace", reservations.length, "#4A3A9A", "reservations"],
+                    ["⚠️", "Expirující", reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).length, "#A32D2D", "reservations"],
+                    ["👥", "Kontakty", contacts.length, "#0F6E56", "contacts"],
+                  ].map(([icon, label, value, color, target]) => (
+                    <div key={label} onClick={() => {
+                      if (target === "projects") setView("projects");
+                      if (target === "leads") loadLeads();
+                      if (target === "reservations") loadReservations();
+                      if (target === "contacts") loadContacts();
+                    }} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "18px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", cursor: target ? "pointer" : "default", transition: "transform 0.15s" }}
+                      onMouseEnter={e => { if (target) e.currentTarget.style.transform = "translateY(-2px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = ""; }}
+                    >
                       <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
                       <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
                       <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>{label}</div>
