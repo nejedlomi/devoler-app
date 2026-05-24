@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
 import Admin from "./Admin";
 
@@ -192,6 +192,54 @@ function ProjectDocuments({ projectId }) {
   );
 }
 
+function ProjectMap({ lat, lng, name }) {
+  const mapRef = useRef(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const initMap = () => {
+      if (!containerRef.current || !window.L || mapRef.current) return;
+      const map = window.L.map(containerRef.current).setView([lat, lng], 15);
+      window.L.tileLayer("https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=fDblwSe3VCWnYFEkUUBE", {
+        attribution: "© MapTiler", maxZoom: 20,
+      }).addTo(map);
+      window.L.marker([lat, lng]).addTo(map).bindPopup(name).openPopup();
+      mapRef.current = map;
+    };
+
+    if (!document.getElementById("leaflet-css-web")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css-web";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+
+    if (!window.L) {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = () => setTimeout(initMap, 200);
+      document.head.appendChild(script);
+    } else {
+      setTimeout(initMap, 200);
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [lat, lng, name]);
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", marginBottom: 20, boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#0D2137", marginBottom: 12 }}>📍 Lokalita</div>
+      <div ref={containerRef} style={{ height: 280, borderRadius: 10, zIndex: 0 }} />
+    </div>
+  );
+}
+
 function MortgageCalculator({ unit }) {
   const [showCalc, setShowCalc] = useState(false);
   const [deposit, setDeposit] = useState(20);
@@ -252,7 +300,6 @@ function MortgageCalculator({ unit }) {
 
 function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
   const [units, setUnits] = useState([]);
-  const [floor, setFloor] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterDisp, setFilterDisp] = useState("");
@@ -267,7 +314,6 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
     const load = async () => {
       const { data } = await supabase.from("units").select("*").eq("project_id", project.id).order("floor");
       setUnits(data || []);
-      if (data && data.length > 0) setFloor(data[0].floor);
       setLoading(false);
     };
     load();
@@ -313,6 +359,10 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
             </div>
           ))}
         </div>
+
+        {project.lat && project.lng && (
+          <ProjectMap lat={project.lat} lng={project.lng} name={project.name} />
+        )}
 
         {project.description && (
           <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", marginBottom: 20, boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
