@@ -388,6 +388,7 @@ export default function Admin() {
     else { await supabase.from("reservations").insert(reservationForm); }
     setReservationForm({});
     await loadReservationsData();
+    await loadProjects();
     setView("reservations");
   };
 
