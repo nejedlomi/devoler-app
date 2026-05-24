@@ -300,6 +300,17 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
   );
 }
 
+const ReservationField = ({ value, onChange, label, type = "text", placeholder, error }) => (
+  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <label style={{ fontSize: 12, color: "#667788", fontWeight: 500 }}>{label}</label>
+    <input type={type} value={value} placeholder={placeholder}
+      onChange={e => onChange(e.target.value)}
+      style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13, border: error ? "1.5px solid #E24B4A" : "1px solid #D0D8E8", background: "#F8FAFE", color: "#0D2137", outline: "none" }}
+    />
+    {error && <span style={{ fontSize: 11, color: "#E24B4A" }}>{error}</span>}
+  </div>
+);
+
 function ReservationForm({ project, unit, onBack, onSuccess }) {
   const [form, setForm] = useState({ jmeno: "", prijmeni: "", email: "", telefon: "", financovani: "vlastni", poznamka: "" });
   const [errors, setErrors] = useState({});
@@ -317,20 +328,31 @@ function ReservationForm({ project, unit, onBack, onSuccess }) {
   const submit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
+
+    // Ulož kontakt
+    const { data: contactData } = await supabase.from("contacts").insert({
+      name: form.jmeno + " " + form.prijmeni,
+      email: form.email,
+      phone: form.telefon,
+      status: "reserved",
+      source: "web",
+    }).select().single();
+
+    // Ulož rezervaci
+    await supabase.from("reservations").insert({
+      unit_id: unit.id,
+      contact_id: contactData?.id,
+      reserved_at: new Date().toISOString().split("T")[0],
+      valid_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().split("T")[0],
+      status: "active",
+      notes: form.poznamka,
+    });
+
+    // Nastav stav bytu
     await supabase.from("units").update({ status: "reserved" }).eq("id", unit.id);
+
     setSubmitted(true);
   };
-
-  const Field = ({ id, label, type = "text", placeholder }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label style={{ fontSize: 12, color: "#667788", fontWeight: 500 }}>{label}</label>
-      <input type={type} value={form[id]} placeholder={placeholder}
-        onChange={e => { setForm(f => ({ ...f, [id]: e.target.value })); setErrors(er => ({ ...er, [id]: "" })); }}
-        style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13, border: errors[id] ? "1.5px solid #E24B4A" : "1px solid #D0D8E8", background: "#F8FAFE", color: "#0D2137", outline: "none" }}
-      />
-      {errors[id] && <span style={{ fontSize: 11, color: "#E24B4A" }}>{errors[id]}</span>}
-    </div>
-  );
 
   if (submitted) return (
     <div style={{ minHeight: "100vh", background: "#F4F7FC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, textAlign: "center" }}>
@@ -356,10 +378,10 @@ function ReservationForm({ project, unit, onBack, onSuccess }) {
           <div style={{ background: "#fff", borderRadius: 14, padding: "20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137", marginBottom: 16 }}>Kontaktní údaje</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Field id="jmeno" label="Jméno *" placeholder="Jan" />
-              <Field id="prijmeni" label="Příjmení *" placeholder="Novák" />
-              <Field id="email" label="E-mail *" type="email" placeholder="jan@email.cz" />
-              <Field id="telefon" label="Telefon *" placeholder="+420 777 000 000" />
+              <ReservationField label="Jméno *" value={form.jmeno} onChange={v => setForm(f => ({ ...f, jmeno: v }))} placeholder="Jan" error={errors.jmeno} />
+              <ReservationField label="Příjmení *" value={form.prijmeni} onChange={v => setForm(f => ({ ...f, prijmeni: v }))} placeholder="Novák" error={errors.prijmeni} />
+              <ReservationField label="E-mail *" type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="jan@email.cz" error={errors.email} />
+              <ReservationField label="Telefon *" value={form.telefon} onChange={v => setForm(f => ({ ...f, telefon: v }))} placeholder="+420 777 000 000" error={errors.telefon} />
             </div>
           </div>
           <div style={{ background: "#fff", borderRadius: 14, padding: "20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
