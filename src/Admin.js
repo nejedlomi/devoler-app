@@ -20,6 +20,9 @@ export default function Admin() {
   const [view, setView] = useState("projects");
   const [selectedProject, setSelectedProject] = useState(null);
   const [filterDisp, setFilterDisp] = useState("Vše");
+  const [filterStatus, setFilterStatus] = useState("Vše");
+  const [filterBuilding, setFilterBuilding] = useState("Vše");
+  const [filterPriceMax, setFilterPriceMax] = useState("");
   const [milestones, setMilestones] = useState([]);
   const [milestoneForm, setMilestoneForm] = useState({});
   const [loading, setLoading] = useState(true);
@@ -284,7 +287,6 @@ export default function Admin() {
               const totalUnits = projects.reduce((s, p) => s + (p.total_units || 0), 0);
               const soldUnits = projects.reduce((s, p) => s + (p.sold_units || 0), 0);
               const availUnits = totalUnits - soldUnits;
-              const totalVolume = projects.reduce((s, p) => s + (p.price_from || 0) * (p.total_units || 0), 0);
 
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
@@ -574,17 +576,40 @@ export default function Admin() {
             </div>
             {(() => {
               const dispTypes = ["Vše", ...new Set(selectedProject.units?.map(u => u.disp).filter(Boolean))];
+              const buildings = ["Vše", ...new Set(selectedProject.units?.map(u => u.building).filter(Boolean))];
               return (
                 <>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-                    {dispTypes.map(d => (
-                      <button key={d} onClick={() => setFilterDisp(d)} style={{
-                        border: filterDisp === d ? "none" : "0.5px solid #ddd",
-                        borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer",
-                        background: filterDisp === d ? "#1D9E75" : "#fff",
-                        color: filterDisp === d ? "#fff" : "#555",
-                      }}>{d}</button>
-                    ))}
+                  <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {dispTypes.map(d => (
+                        <button key={d} onClick={() => setFilterDisp(d)} style={{
+                          border: filterDisp === d ? "none" : "0.5px solid #ddd",
+                          borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer",
+                          background: filterDisp === d ? "#1D9E75" : "#fff",
+                          color: filterDisp === d ? "#fff" : "#555",
+                        }}>{d}</button>
+                      ))}
+                    </div>
+                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: "5px 10px", borderRadius: 20, border: "0.5px solid #ddd", fontSize: 12, background: "#fff", cursor: "pointer" }}>
+                      <option value="Vše">Všechny stavy</option>
+                      <option value="available">Volné</option>
+                      <option value="reserved">Rezervované</option>
+                      <option value="sold">Prodané</option>
+                      <option value="blocked">Blokované</option>
+                    </select>
+                    {buildings.length > 1 && (
+                      <select value={filterBuilding} onChange={e => setFilterBuilding(e.target.value)} style={{ padding: "5px 10px", borderRadius: 20, border: "0.5px solid #ddd", fontSize: 12, background: "#fff", cursor: "pointer" }}>
+                        {buildings.map(b => <option key={b} value={b}>{b === "Vše" ? "Všechny budovy" : `Budova ${b}`}</option>)}
+                      </select>
+                    )}
+                    <input type="number" placeholder="Max. cena Kč" value={filterPriceMax} onChange={e => setFilterPriceMax(e.target.value)}
+                      style={{ padding: "5px 12px", borderRadius: 20, border: "0.5px solid #ddd", fontSize: 12, width: 140 }} />
+                    {(filterDisp !== "Vše" || filterStatus !== "Vše" || filterBuilding !== "Vše" || filterPriceMax) && (
+                      <button onClick={() => { setFilterDisp("Vše"); setFilterStatus("Vše"); setFilterBuilding("Vše"); setFilterPriceMax(""); }}
+                        style={{ padding: "5px 12px", borderRadius: 20, border: "0.5px solid #E24B4A", fontSize: 12, background: "#FCEBEB", color: "#A32D2D", cursor: "pointer" }}>
+                        × Reset filtrů
+                      </button>
+                    )}
                   </div>
                 </>
               );
@@ -615,7 +640,13 @@ export default function Admin() {
             })()}
             {selectedProject.units?.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné byty.</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {(filterDisp === "Vše" ? selectedProject.units : selectedProject.units?.filter(u => u.disp === filterDisp))?.map(u => {
+              {selectedProject.units?.filter(u => {
+                if (filterDisp !== "Vše" && u.disp !== filterDisp) return false;
+                if (filterStatus !== "Vše" && u.status !== filterStatus) return false;
+                if (filterBuilding !== "Vše" && u.building !== filterBuilding) return false;
+                if (filterPriceMax && (u.price_net || u.price || 0) > parseInt(filterPriceMax)) return false;
+                return true;
+              })?.map(u => {
                 const sc = statusColor(u.status);
                 return (
                   <div key={u.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
