@@ -12,6 +12,9 @@ function Section({ title, first, children }) {
 }
 
 export default function Admin() {
+  const [authed, setAuthed] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  const [loginError, setLoginError] = useState("");
   const [projects, setProjects] = useState([]);
   const [view, setView] = useState("projects");
   const [selectedProject, setSelectedProject] = useState(null);
@@ -192,6 +195,38 @@ export default function Admin() {
   const statusLabel = (s) => ({
     available: "Volná", reserved: "Rezervovaná", sold: "Prodaná", blocked: "Blokovaná", withdrawn: "Stažená"
   }[s] || s);
+
+  const login = async () => {
+    const { data } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password).single();
+    if (data) { setAuthed(true); setLoginError(""); }
+    else { setLoginError("Špatné jméno nebo heslo"); }
+  };
+
+  if (!authed) return (
+    <div style={{ minHeight: "100vh", background: "#04342C", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 36, width: 340, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>🏗 Admin panel</div>
+        <div style={{ fontSize: 13, color: "#999", marginBottom: 24 }}>Přihlaste se pro přístup</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Uživatelské jméno</label>
+            <input type="text" value={loginForm.username} onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))}
+              style={{ width: "100%", marginTop: 4, padding: "10px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Heslo</label>
+            <input type="password" value={loginForm.password} onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
+              onKeyDown={async e => { if (e.key === "Enter") await login(); }}
+              style={{ width: "100%", marginTop: 4, padding: "10px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+          {loginError && <div style={{ fontSize: 12, color: "#E24B4A" }}>{loginError}</div>}
+          <button onClick={login} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>
+            Přihlásit se
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#f7f7f5", fontFamily: "'DM Sans', sans-serif" }}>
