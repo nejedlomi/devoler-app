@@ -1345,8 +1345,22 @@ export default function Admin() {
             <input type="text" placeholder="Hledat kontakt..." value={contactSearch} onChange={e => setContactSearch(e.target.value)}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #ddd", fontSize: 13, marginBottom: 14, boxSizing: "border-box", background: "#fff" }} />
 
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <button onClick={() => setContactSearch("")} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "0.5px solid #ddd", background: !contactSearch.startsWith("__expiring") ? "#1D9E75" : "#fff", color: !contactSearch.startsWith("__expiring") ? "#fff" : "#555" }}>
+                Všechny
+              </button>
+              <button onClick={() => setContactSearch("__expiring")} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "0.5px solid #ddd", background: contactSearch.startsWith("__expiring") ? "#FAEEDA" : "#fff", color: contactSearch.startsWith("__expiring") ? "#633806" : "#555" }}>
+                ⚠️ Expirující rezervace
+              </button>
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {contacts.filter(c => !contactSearch || c.name?.toLowerCase().includes(contactSearch.toLowerCase()) || c.email?.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone?.includes(contactSearch)).map(c => {
+              {contacts.filter(c => {
+                if (contactSearch === "__expiring") {
+                  return reservations.some(r => r.contact_id === c.id && r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date());
+                }
+                return !contactSearch || c.name?.toLowerCase().includes(contactSearch.toLowerCase()) || c.email?.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone?.includes(contactSearch);
+              }).map(c => {
                 const statusColors = { lead: { bg: "#EEF3FA", color: "#1A3A6B" }, interested: { bg: "#FAEEDA", color: "#633806" }, reserved: { bg: "#E1F5EE", color: "#0F6E56" }, buyer: { bg: "#0F6E56", color: "#fff" }, lost: { bg: "#f0f0f0", color: "#666" } };
                 const statusLabels = { lead: "Zájemce", interested: "Má zájem", reserved: "Rezervoval", buyer: "Kupující", lost: "Ztracen" };
                 const sc = statusColors[c.status] || statusColors.lead;
@@ -1354,7 +1368,12 @@ export default function Admin() {
                   <div key={c.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{c.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{c.name}</div>
+                          {reservations.some(r => r.contact_id === c.id && r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()) && (
+                            <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20, fontWeight: 500 }}>⚠️ Expiruje rezervace</span>
+                          )}
+                        </div>
                         <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color, fontWeight: 500 }}>{statusLabels[c.status] || c.status}</span>
                       </div>
                       <div style={{ fontSize: 12, color: "#999" }}>
