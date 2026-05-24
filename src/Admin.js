@@ -309,8 +309,12 @@ export default function Admin() {
     loadTasks();
   };
 
-  const completeTask = async (id) => {
-    await supabase.from("tasks").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", id);
+  const completeTask = async (id, currentStatus) => {
+    if (currentStatus === "done") {
+      await supabase.from("tasks").update({ status: "todo", completed_at: null }).eq("id", id);
+    } else {
+      await supabase.from("tasks").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", id);
+    }
     loadTasks();
   };
 
@@ -2126,30 +2130,84 @@ export default function Admin() {
               }).map(t => {
                 const today = new Date().toISOString().split("T")[0];
                 const isOverdue = t.due_date < today && t.status !== "done";
+                const isSoon = t.due_date === today && t.status !== "done";
                 const priorityColors = { high: "#E24B4A", medium: "#EF9F27", low: "#1D9E75" };
                 const priorityLabels = { high: "Vysoká", medium: "Střední", low: "Nízká" };
+                const typeIcons = {
+                  call: "📞", email: "✉️", meeting: "🤝", document: "📄",
+                  price: "💰", viewing: "🏠", contract: "📝", general: "✅"
+                };
+                const typeLabels = {
+                  call: "Hovor", email: "E-mail", meeting: "Schůzka", document: "Dokument",
+                  price: "Cena", viewing: "Prohlídka", contract: "Smlouva", general: "Obecný"
+                };
+                const checklist = Array.isArray(t.checklist) ? t.checklist : [];
+                const doneItems = checklist.filter(c => c.done).length;
+
                 return (
-                  <div key={t.id} style={{ background: "#fff", border: `0.5px solid ${isOverdue ? "#E24B4A" : "#e8e8e8"}`, borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <button onClick={() => completeTask(t.id)} style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${t.status === "done" ? "#1D9E75" : "#ddd"}`, background: t.status === "done" ? "#1D9E75" : "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff" }}>
-                      {t.status === "done" ? "✓" : ""}
-                    </button>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: t.status === "done" ? "#aaa" : "#1a1a1a", textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</div>
-                        <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: priorityColors[t.priority] + "20", color: priorityColors[t.priority], fontWeight: 600 }}>
-                          {priorityLabels[t.priority]}
-                        </span>
+                  <div key={t.id} style={{
+                    background: "#fff",
+                    border: `1px solid ${isOverdue ? "#E24B4A" : isSoon ? "#EF9F27" : "#e8e8e8"}`,
+                    borderLeft: `4px solid ${priorityColors[t.priority] || "#ddd"}`,
+                    borderRadius: 12, padding: "16px 18px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <button onClick={() => completeTask(t.id, t.status)} style={{
+                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                        border: `2px solid ${t.status === "done" ? "#1D9E75" : "#ddd"}`,
+                        background: t.status === "done" ? "#1D9E75" : "#fff",
+                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, color: "#fff"
+                      }}>
+                        {t.status === "done" ? "✓" : ""}
+                      </button>
+
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 18 }}>{typeIcons[t.type] || "✅"}</span>
+                          <span style={{ fontSize: 15, fontWeight: 600, color: t.status === "done" ? "#aaa" : "#1a1a1a", textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</span>
+                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: priorityColors[t.priority] + "20", color: priorityColors[t.priority], fontWeight: 600, marginLeft: "auto" }}>
+                            {priorityLabels[t.priority]}
+                          </span>
+                        </div>
+
+                        {t.description && <div style={{ fontSize: 13, color: "#666", marginBottom: 8, lineHeight: 1.5 }}>{t.description}</div>}
+
+                        {checklist.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ height: 4, background: "#f0f0f0", borderRadius: 2, marginBottom: 6 }}>
+                              <div style={{ height: 4, width: `${checklist.length > 0 ? (doneItems / checklist.length) * 100 : 0}%`, background: "#1D9E75", borderRadius: 2 }} />
+                            </div>
+                            <div style={{ fontSize: 11, color: "#999" }}>{doneItems}/{checklist.length} splněno</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                              {checklist.map((item, i) => (
+                                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: item.done ? "#aaa" : "#333" }}>
+                                  <input type="checkbox" checked={item.done} onChange={async () => {
+                                    const newChecklist = checklist.map((c, j) => j === i ? { ...c, done: !c.done } : c);
+                                    await supabase.from("tasks").update({ checklist: newChecklist }).eq("id", t.id);
+                                    loadTasks();
+                                  }} style={{ accentColor: "#1D9E75" }} />
+                                  <span style={{ textDecoration: item.done ? "line-through" : "none" }}>{item.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11, color: "#999" }}>
+                          {t.due_date && <span style={{ color: isOverdue ? "#E24B4A" : isSoon ? "#EF9F27" : "#999" }}>📅 {t.due_date}</span>}
+                          {t.assigned_to && <span>👤 {t.assigned_to}</span>}
+                          {t.projects?.name && <span>🏗 {t.projects.name}</span>}
+                          {t.contacts?.name && <span>👥 {t.contacts.name}</span>}
+                          <span>{typeLabels[t.type] || "Obecný"}</span>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: "#999" }}>
-                        {t.due_date && `📅 ${t.due_date}`}
-                        {t.assigned_to && ` · 👤 ${t.assigned_to}`}
-                        {t.projects?.name && ` · 🏗 ${t.projects.name}`}
-                        {t.contacts?.name && ` · 👤 ${t.contacts.name}`}
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <button onClick={() => { setTaskForm(t); setView("editTask"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>✏️</button>
+                        <button onClick={() => deleteTask(t.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>×</button>
                       </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => { setTaskForm(t); setView("editTask"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                      <button onClick={() => deleteTask(t.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>×</button>
                     </div>
                   </div>
                 );
@@ -2205,10 +2263,56 @@ export default function Admin() {
                   {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Typ úkolu</label>
+                <select value={taskForm.type || "general"} onChange={e => setTaskForm(f => ({ ...f, type: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="general">✅ Obecný</option>
+                  <option value="call">📞 Hovor</option>
+                  <option value="email">✉️ E-mail</option>
+                  <option value="meeting">🤝 Schůzka</option>
+                  <option value="document">📄 Dokument</option>
+                  <option value="price">💰 Cena</option>
+                  <option value="viewing">🏠 Prohlídka</option>
+                  <option value="contract">📝 Smlouva</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
+                <select value={taskForm.status || "todo"} onChange={e => setTaskForm(f => ({ ...f, status: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="todo">K řešení</option>
+                  <option value="inprogress">Probíhá</option>
+                  <option value="done">Hotovo</option>
+                </select>
+              </div>
               <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Popis</label>
                 <textarea value={taskForm.description || ""} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))}
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Checklist</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {(Array.isArray(taskForm.checklist) ? taskForm.checklist : []).map((item, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={item.done} onChange={() => {
+                        const newChecklist = (taskForm.checklist || []).map((c, j) => j === i ? { ...c, done: !c.done } : c);
+                        setTaskForm(f => ({ ...f, checklist: newChecklist }));
+                      }} style={{ accentColor: "#1D9E75" }} />
+                      <input type="text" value={item.text} onChange={e => {
+                        const newChecklist = (taskForm.checklist || []).map((c, j) => j === i ? { ...c, text: e.target.value } : c);
+                        setTaskForm(f => ({ ...f, checklist: newChecklist }));
+                      }} style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa" }} />
+                      <button onClick={() => setTaskForm(f => ({ ...f, checklist: (f.checklist || []).filter((_, j) => j !== i) }))}
+                        style={{ background: "none", border: "none", color: "#E24B4A", cursor: "pointer", fontSize: 16 }}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => setTaskForm(f => ({ ...f, checklist: [...(Array.isArray(f.checklist) ? f.checklist : []), { text: "", done: false }] }))}
+                    style={{ background: "#f0f0f0", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#555", alignSelf: "flex-start" }}>
+                    + Přidat položku
+                  </button>
+                </div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
