@@ -1,6 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
+import * as XLSX from "xlsx";
+import { generateUnitPDF } from "./UnitPDF";
 
 function Section({ title, first, children }) {
   return (
@@ -429,6 +431,36 @@ export default function Admin() {
                 </div>
               </div>
               <button onClick={() => { setUnitForm({}); setView("editUnit"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový byt</button>
+              <button onClick={() => {
+                const rows = selectedProject.units.map(u => ({
+                  "Číslo": u.unit_number,
+                  "Budova": u.building || "",
+                  "Patro": u.floor,
+                  "Dispozice": u.disp,
+                  "Plocha m²": u.area,
+                  "Orientace": u.orientation || "",
+                  "Balkon": u.balcony ? "Ano" : "Ne",
+                  "Typ balkonu": u.balcony_type || "",
+                  "Plocha balkonu": u.balcony_area || "",
+                  "Sklep": u.cellar ? "Ano" : "Ne",
+                  "Parkoviště": u.parking ? "Ano" : "Ne",
+                  "Cena bez DPH": u.price_net || "",
+                  "Cena s DPH": u.price_net ? Math.round(u.price_net * 1.12) : "",
+                  "Cena/m²": u.price_per_sqm || "",
+                  "Akční cena": u.price_action || "",
+                  "Stav": u.status,
+                  "Kupující": u.buyer || "",
+                  "Datum rezervace": u.reserved_at || "",
+                  "Datum smlouvy": u.contract_signed_at || "",
+                  "Poznámky": u.notes || "",
+                }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Ceník");
+                XLSX.writeFile(wb, `cenik-${selectedProject.name}.xlsx`);
+              }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                📊 Export Excel
+              </button>
             </div>
             {(() => {
               const dispTypes = ["Vše", ...new Set(selectedProject.units?.map(u => u.disp).filter(Boolean))];
@@ -447,6 +479,30 @@ export default function Admin() {
                 </>
               );
             })()}
+            {selectedProject.units?.length > 0 && (() => {
+              const units = selectedProject.units;
+              const totalVolume = units.reduce((s, u) => s + (u.price_net || 0), 0);
+              const avgPriceM2 = units.filter(u => u.price_per_sqm > 0).reduce((s, u, _, a) => s + u.price_per_sqm / a.length, 0);
+              const byStatus = { available: 0, reserved: 0, sold: 0, blocked: 0 };
+              units.forEach(u => { if (byStatus[u.status] !== undefined) byStatus[u.status]++; });
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                  {[
+                    ["Celkový objem", totalVolume ? totalVolume.toLocaleString("cs-CZ") + " Kč" : "—"],
+                    ["Prům. cena/m²", avgPriceM2 ? Math.round(avgPriceM2).toLocaleString("cs-CZ") + " Kč" : "—"],
+                    ["Volné", byStatus.available],
+                    ["Rezervované", byStatus.reserved],
+                    ["Prodané", byStatus.sold],
+                    ["Blokované", byStatus.blocked],
+                  ].map(([l, v]) => (
+                    <div key={l} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "10px 14px" }}>
+                      <div style={{ fontSize: 11, color: "#999" }}>{l}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             {selectedProject.units?.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné byty.</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {(filterDisp === "Vše" ? selectedProject.units : selectedProject.units?.filter(u => u.disp === filterDisp))?.map(u => {
@@ -461,6 +517,9 @@ export default function Admin() {
                       {u.buyer && <div style={{ fontSize: 12, color: "#999" }}>👤 {u.buyer}</div>}
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => generateUnitPDF(selectedProject, u)} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>
+                        📄 PDF
+                      </button>
                       <button onClick={() => { setUnitForm(u); setView("editUnit"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
                       <button onClick={() => deleteUnit(u.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
                     </div>
@@ -526,6 +585,9 @@ export default function Admin() {
                   {unitForm.price_net ? Math.round(unitForm.price_net * 1.12).toLocaleString("cs-CZ") + " Kč" : "—"}
                 </div>
               </div>
+              <Input label="Akční cena bez DPH (Kč)" field="price_action" type="number" obj={unitForm} setObj={setUnitForm} />
+              <Input label="Poznámka k akční ceně" field="price_action_note" obj={unitForm} setObj={setUnitForm} />
+              <Input label="Rezervační cena (Kč)" field="price_reservation" type="number" obj={unitForm} setObj={setUnitForm} />
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1a1a1a", cursor: "pointer", gridColumn: "1 / -1" }}>
                 <input type="checkbox" checked={unitForm.price_public !== false}
                   onChange={e => setUnitForm(f => ({ ...f, price_public: e.target.checked }))}
