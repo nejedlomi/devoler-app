@@ -2,6 +2,12 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
 
+const getImages = (images) => {
+  if (!images) return [];
+  if (typeof images === "string") return JSON.parse(images);
+  return images;
+};
+
 export default function Admin() {
   const [projects, setProjects] = useState([]);
   const [view, setView] = useState("projects");
@@ -108,10 +114,12 @@ export default function Admin() {
   };
 
   const saveProject = async () => {
+    const images = getImages(form.images);
+    const projectData = { ...form, images: images.length ? JSON.stringify(images) : null };
     if (form.id) {
-      await supabase.from("projects").update(form).eq("id", form.id);
+      await supabase.from("projects").update(projectData).eq("id", form.id);
     } else {
-      await supabase.from("projects").insert(form);
+      await supabase.from("projects").insert(projectData);
     }
     setView("projects");
     setForm({});
@@ -304,13 +312,13 @@ export default function Admin() {
                     urls.push(urlData.publicUrl);
                   }
                 }
-                setForm(f => ({ ...f, images: [...(f.images || []), ...urls] }));
+                setForm(f => ({ ...f, images: [...getImages(f.images), ...urls] }));
               }} style={{ marginTop: 6, fontSize: 13 }} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                {(form.images || []).map((url, i) => (
+                {getImages(form.images).map((url, i) => (
                   <div key={i} style={{ position: "relative" }}>
                     <img src={url} alt="" style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 8 }} />
-                    <button onClick={() => setForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                    <button onClick={() => setForm(f => ({ ...f, images: getImages(f.images).filter((_, j) => j !== i) }))}
                       style={{ position: "absolute", top: 2, right: 2, background: "#E24B4A", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       ×
                     </button>

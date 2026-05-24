@@ -6,46 +6,87 @@ const fmt = (n) => n?.toLocaleString("cs-CZ") + " Kč";
 
 const STATUS_LABELS = { available: "Volný", reserved: "Rezervováno", sold: "Prodáno" };
 const STATUS_COLORS = {
-  available: { bg: "#E1F5EE", color: "#0F6E56", border: "#9FE1CB" },
-  reserved: { bg: "#FAEEDA", color: "#633806", border: "#FAC775" },
-  sold: { bg: "#F1EFE8", color: "#5F5E5A", border: "#D3D1C7" },
+  available: { bg: "#E8F5F0", color: "#0A5C42", border: "#7BC4A8" },
+  reserved: { bg: "#FEF3E2", color: "#7A4A0A", border: "#F5C275" },
+  sold: { bg: "#F0F0F0", color: "#555", border: "#CCC" },
+};
+
+const getImages = (images) => {
+  if (!images) return [];
+  if (Array.isArray(images)) return images;
+  try { return JSON.parse(images); } catch { return []; }
 };
 
 function ProjectCard({ project, onClick }) {
   const avail = project.total_units - project.sold_units;
   const pct = project.total_units > 0 ? Math.round((project.sold_units / project.total_units) * 100) : 0;
   const isSoon = project.total_units === 0;
+  const imgs = getImages(project.images);
+
   return (
     <div onClick={() => !isSoon && onClick(project)} style={{
-      background: "#fff", border: "0.5px solid #e0e0e0", borderRadius: 14, overflow: "hidden",
-      cursor: isSoon ? "default" : "pointer", transition: "border-color 0.15s, transform 0.15s", opacity: isSoon ? 0.8 : 1,
+      background: "#fff",
+      borderRadius: 16,
+      overflow: "hidden",
+      cursor: isSoon ? "default" : "pointer",
+      boxShadow: "0 2px 12px rgba(10,30,60,0.08)",
+      transition: "transform 0.18s, box-shadow 0.18s",
+      border: "1px solid #E8EDF5",
     }}
-      onMouseEnter={e => { if (!isSoon) { e.currentTarget.style.borderColor = project.color || "#1D9E75"; e.currentTarget.style.transform = "translateY(-2px)"; } }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0e0e0"; e.currentTarget.style.transform = ""; }}
+      onMouseEnter={e => { if (!isSoon) { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(10,30,60,0.14)"; } }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 2px 12px rgba(10,30,60,0.08)"; }}
     >
-      <div style={{ height: 120, background: project.bg || "#E1F5EE", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <span style={{ fontSize: 44 }}>🏢</span>
-        <div style={{
-          position: "absolute", top: 10, left: 10, fontSize: 11, padding: "3px 10px", borderRadius: 20, fontWeight: 500,
-          background: isSoon ? "#FAEEDA" : avail <= 3 && avail > 0 ? "#FCEBEB" : avail === 0 ? "#F1EFE8" : project.bg || "#E1F5EE",
-          color: isSoon ? "#633806" : avail <= 3 && avail > 0 ? "#A32D2D" : avail === 0 ? "#5F5E5A" : project.color || "#1D9E75",
-        }}>
-          {isSoon ? "Připravujeme" : avail === 0 ? "Vyprodáno" : avail <= 3 ? "Poslední byty" : project.type}
+      <div style={{ height: 200, position: "relative", overflow: "hidden", background: "#1a2e4a" }}>
+        {imgs[0] ? (
+          <img src={imgs[0]} alt={project.name} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, background: "linear-gradient(135deg, #1a2e4a 0%, #2d4a6e 100%)" }}>🏗</div>
+        )}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,20,40,0.7) 0%, transparent 50%)" }} />
+        <div style={{ position: "absolute", top: 12, left: 12 }}>
+          <span style={{
+            fontSize: 11, padding: "4px 10px", borderRadius: 20, fontWeight: 600,
+            background: isSoon ? "rgba(250,200,80,0.9)" : avail === 0 ? "rgba(150,150,150,0.9)" : avail <= 3 ? "rgba(220,60,60,0.9)" : "rgba(255,255,255,0.15)",
+            color: isSoon ? "#7A4A0A" : avail === 0 ? "#fff" : avail <= 3 ? "#fff" : "#fff",
+            backdropFilter: "blur(4px)",
+          }}>
+            {isSoon ? "Připravujeme" : avail === 0 ? "Vyprodáno" : avail <= 3 ? "Poslední byty" : project.type}
+          </span>
+        </div>
+        <div style={{ position: "absolute", bottom: 14, left: 14, right: 14 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>{project.name}</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>📍 {project.location}</div>
         </div>
       </div>
-      <div style={{ padding: "12px 14px" }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{project.name}</div>
-        <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>📍 {project.location}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, alignItems: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>od {fmt(project.price_from)}</div>
-          <div style={{ fontSize: 11, color: "#999" }}>{avail} / {project.total_units} volných</div>
+
+      <div style={{ padding: "16px 18px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div style={{ background: "#F4F7FC", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#8899AA", fontWeight: 500, marginBottom: 3 }}>Cena od</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137" }}>{project.price_from ? (project.price_from / 1000000).toFixed(1) + " mil. Kč" : "—"}</div>
+          </div>
+          <div style={{ background: "#F4F7FC", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#8899AA", fontWeight: 500, marginBottom: 3 }}>Dokončení</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137" }}>{project.completion || "—"}</div>
+          </div>
+          <div style={{ background: "#F4F7FC", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#8899AA", fontWeight: 500, marginBottom: 3 }}>Dostupné byty</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137" }}>{avail} / {project.total_units}</div>
+          </div>
+          <div style={{ background: "#F4F7FC", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#8899AA", fontWeight: 500, marginBottom: 3 }}>Typ</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137" }}>{project.type || "—"}</div>
+          </div>
         </div>
-        <div style={{ marginTop: 8, height: 4, background: "#f0f0f0", borderRadius: 2 }}>
-          <div style={{ height: 4, width: `${pct}%`, background: pct === 100 ? "#D3D1C7" : project.color || "#1D9E75", borderRadius: 2 }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-          <div style={{ fontSize: 10, color: "#bbb" }}>Prodáno {pct}%</div>
-          <div style={{ fontSize: 10, color: "#bbb" }}>Dokončení {project.completion}</div>
+
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#8899AA", marginBottom: 5 }}>
+            <span>Prodáno {pct}%</span>
+            <span>{project.sold_units} z {project.total_units} bytů</span>
+          </div>
+          <div style={{ height: 6, background: "#E8EDF5", borderRadius: 3 }}>
+            <div style={{ height: 6, width: `${pct}%`, background: pct === 100 ? "#AAB5C0" : "#1A3A6B", borderRadius: 3, transition: "width 0.4s" }} />
+          </div>
         </div>
       </div>
     </div>
@@ -57,18 +98,43 @@ function UnitCell({ unit, selected, onClick }) {
   const isClickable = unit.status !== "sold";
   return (
     <div onClick={() => isClickable && onClick(unit)} style={{
-      border: selected ? `2px solid #1D9E75` : `0.5px solid ${sc.border}`,
+      border: selected ? `2px solid #1A3A6B` : `1px solid ${sc.border}`,
       borderRadius: 10, padding: "10px 8px", textAlign: "center",
       cursor: isClickable ? "pointer" : "default",
-      background: selected ? "#E1F5EE" : sc.bg,
-      opacity: unit.status === "sold" ? 0.55 : 1,
+      background: selected ? "#E8EDF8" : sc.bg,
+      opacity: unit.status === "sold" ? 0.5 : 1,
+      transition: "all 0.12s",
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{unit.unit_number}</div>
-      <div style={{ fontSize: 11, color: "#666", marginTop: 1 }}>{unit.disp}</div>
-      <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{unit.area} m²</div>
-      <div style={{ fontSize: 11, marginTop: 4, fontWeight: 500, color: unit.status === "available" ? "#0F6E56" : unit.status === "reserved" ? "#854F0B" : "#888" }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#0D2137" }}>{unit.unit_number}</div>
+      <div style={{ fontSize: 11, color: "#556677", marginTop: 1 }}>{unit.disp}</div>
+      <div style={{ fontSize: 10, color: "#8899AA", marginTop: 2 }}>{unit.area} m²</div>
+      <div style={{ fontSize: 11, marginTop: 4, fontWeight: 600, color: unit.status === "available" ? "#0A5C42" : unit.status === "reserved" ? "#7A4A0A" : "#888" }}>
         {unit.status === "available" ? fmt(unit.price) : STATUS_LABELS[unit.status]}
       </div>
+    </div>
+  );
+}
+
+function ImageGallery({ images }) {
+  const [current, setCurrent] = useState(0);
+  if (!images || images.length === 0) return (
+    <div style={{ height: 320, background: "linear-gradient(135deg, #1a2e4a 0%, #2d4a6e 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>🏗</div>
+  );
+  return (
+    <div style={{ position: "relative", height: 320 }}>
+      <img src={images[current]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,20,40,0.5) 0%, transparent 40%)" }} />
+      {images.length > 1 && (
+        <>
+          <button onClick={() => setCurrent(c => (c - 1 + images.length) % images.length)} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: "pointer", backdropFilter: "blur(4px)" }}>‹</button>
+          <button onClick={() => setCurrent(c => (c + 1) % images.length)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: "pointer", backdropFilter: "blur(4px)" }}>›</button>
+          <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>
+            {images.map((_, i) => (
+              <div key={i} onClick={() => setCurrent(i)} style={{ width: i === current ? 20 : 6, height: 6, borderRadius: 3, background: i === current ? "#fff" : "rgba(255,255,255,0.5)", cursor: "pointer", transition: "all 0.2s" }} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -78,6 +144,7 @@ function ProjectDetail({ project, onBack, onReserve }) {
   const [floor, setFloor] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [loading, setLoading] = useState(true);
+  const imgs = getImages(project.images);
 
   useEffect(() => {
     const load = async () => {
@@ -91,73 +158,105 @@ function ProjectDetail({ project, onBack, onReserve }) {
 
   const floors = [...new Set(units.map(u => u.floor))].sort();
   const floorUnits = units.filter(u => u.floor === floor);
+  const avail = project.total_units - project.sold_units;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <div style={{ background: "#04342C", padding: "16px 20px" }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#9FE1CB", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 8 }}>← Zpět</button>
-        <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>{project.name}</div>
-        <div style={{ fontSize: 13, color: "#9FE1CB", marginTop: 3 }}>📍 {project.address} · {project.type} · Dokončení {project.completion}</div>
-        <div style={{ fontSize: 13, color: "#9FE1CB", marginTop: 6, lineHeight: 1.5 }}>{project.description}</div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", background: "#f7f7f5", minHeight: 400 }}>
-        <div style={{ padding: 18 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#999", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Vyberte patro a byt</div>
-          {loading ? <div style={{ color: "#aaa" }}>Načítám byty...</div> : (
-            <>
-              <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-                {floors.map(f => (
-                  <button key={f} onClick={() => { setFloor(f); setSelectedUnit(null); }} style={{
-                    border: floor === f ? "none" : "0.5px solid #ddd", borderRadius: 8, padding: "5px 14px", fontSize: 13, cursor: "pointer",
-                    background: floor === f ? "#1D9E75" : "#fff", color: floor === f ? "#fff" : "#555",
-                  }}>{f}. patro</button>
-                ))}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8 }}>
-                {floorUnits.map(u => <UnitCell key={u.id} unit={u} selected={selectedUnit?.id === u.id} onClick={setSelectedUnit} />)}
-              </div>
-              {floorUnits.length === 0 && <div style={{ color: "#aaa", fontSize: 14 }}>Na tomto patře nejsou byty.</div>}
-              <div style={{ display: "flex", gap: 14, marginTop: 16 }}>
-                {["available", "reserved", "sold"].map(s => (
-                  <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" }}>
-                    <div style={{ width: 11, height: 11, borderRadius: 3, background: STATUS_COLORS[s].bg, border: `0.5px solid ${STATUS_COLORS[s].border}` }} />
-                    {STATUS_LABELS[s]}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+    <div style={{ minHeight: "100vh", background: "#F4F7FC" }}>
+      <div style={{ position: "relative" }}>
+        <ImageGallery images={imgs} />
+        <button onClick={onBack} style={{ position: "absolute", top: 16, left: 16, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 20, padding: "8px 16px", color: "#fff", fontSize: 13, cursor: "pointer", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", gap: 6 }}>
+          ← Zpět
+        </button>
+        <div style={{ position: "absolute", bottom: 20, left: 20 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>{project.name}</div>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginTop: 4 }}>📍 {project.address}</div>
         </div>
-        <div style={{ background: "#fff", borderLeft: "0.5px solid #e8e8e8", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-          {selectedUnit ? (
-            <>
-              <div style={{ background: "#f7f7f5", borderRadius: 10, padding: 14 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>Byt č. {selectedUnit.unit_number} · {selectedUnit.disp}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#1D9E75", marginTop: 4 }}>{fmt(selectedUnit.price)}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 12 }}>
-                  {[["Plocha", `${selectedUnit.area} m²`], ["Patro", `${selectedUnit.floor}. patro`], ["Balkon", selectedUnit.balcony ? "Ano" : "Ne"], ["Parkoviště", selectedUnit.parking ? "V ceně" : "Ne"], ["Sklep", selectedUnit.cellar ? "Ano" : "Ne"]].map(([l, v]) => (
-                    <div key={l} style={{ background: "#fff", borderRadius: 8, padding: "8px 10px" }}>
-                      <div style={{ fontSize: 10, color: "#aaa" }}>{l}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{v}</div>
+      </div>
+
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+          {[
+            ["Cena od", project.price_from ? (project.price_from / 1000000).toFixed(1) + " mil. Kč" : "—"],
+            ["Volné byty", `${avail} / ${project.total_units}`],
+            ["Dokončení", project.completion || "—"],
+            ["Typ", project.type || "—"],
+          ].map(([l, v]) => (
+            <div key={l} style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+              <div style={{ fontSize: 11, color: "#8899AA", fontWeight: 500, marginBottom: 4 }}>{l}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#0D2137" }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {project.description && (
+          <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", marginBottom: 20, boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#0D2137", marginBottom: 8 }}>O projektu</div>
+            <div style={{ fontSize: 14, color: "#445566", lineHeight: 1.7 }}>{project.description}</div>
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#0D2137", marginBottom: 14 }}>Výběr bytu</div>
+            {loading ? <div style={{ color: "#aaa" }}>Načítám...</div> : (
+              <>
+                <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+                  {floors.map(f => (
+                    <button key={f} onClick={() => { setFloor(f); setSelectedUnit(null); }} style={{
+                      border: floor === f ? "none" : "1px solid #D0D8E8",
+                      borderRadius: 8, padding: "5px 14px", fontSize: 13, cursor: "pointer",
+                      background: floor === f ? "#1A3A6B" : "#fff",
+                      color: floor === f ? "#fff" : "#445566", fontWeight: floor === f ? 600 : 400,
+                    }}>{f}. patro</button>
+                  ))}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8 }}>
+                  {floorUnits.map(u => <UnitCell key={u.id} unit={u} selected={selectedUnit?.id === u.id} onClick={setSelectedUnit} />)}
+                </div>
+                {floorUnits.length === 0 && <div style={{ color: "#aaa", fontSize: 14 }}>Žádné byty na tomto patře.</div>}
+                <div style={{ display: "flex", gap: 14, marginTop: 14 }}>
+                  {["available", "reserved", "sold"].map(s => (
+                    <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#8899AA" }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 2, background: STATUS_COLORS[s].bg, border: `1px solid ${STATUS_COLORS[s].border}` }} />
+                      {STATUS_LABELS[s]}
                     </div>
                   ))}
                 </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5", display: "flex", flexDirection: "column", gap: 12 }}>
+            {selectedUnit ? (
+              <>
+                <div style={{ background: "#F4F7FC", borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137" }}>Byt č. {selectedUnit.unit_number} · {selectedUnit.disp}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#1A3A6B", marginTop: 6 }}>{fmt(selectedUnit.price)}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 12 }}>
+                    {[["Plocha", `${selectedUnit.area} m²`], ["Patro", `${selectedUnit.floor}. patro`], ["Balkon", selectedUnit.balcony ? "Ano" : "Ne"], ["Parkoviště", selectedUnit.parking ? "V ceně" : "Ne"]].map(([l, v]) => (
+                      <div key={l} style={{ background: "#fff", borderRadius: 8, padding: "8px 10px" }}>
+                        <div style={{ fontSize: 10, color: "#8899AA" }}>{l}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0D2137" }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {selectedUnit.status === "available" && (
+                  <button onClick={() => onReserve(project, selectedUnit)} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    Rezervovat byt
+                  </button>
+                )}
+                {selectedUnit.status === "reserved" && (
+                  <div style={{ background: "#FEF3E2", borderRadius: 10, padding: 12, fontSize: 13, color: "#7A4A0A", textAlign: "center" }}>Byt je rezervován.</div>
+                )}
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, color: "#AABBCC", textAlign: "center", gap: 8, padding: "20px 0" }}>
+                <div style={{ fontSize: 32 }}>👆</div>
+                <div style={{ fontSize: 13 }}>Klikněte na volný byt</div>
               </div>
-              {selectedUnit.status === "available" && (
-                <button onClick={() => onReserve(project, selectedUnit)} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                  📅 Rezervovat byt
-                </button>
-              )}
-              {selectedUnit.status === "reserved" && (
-                <div style={{ background: "#FAEEDA", borderRadius: 10, padding: 12, fontSize: 13, color: "#633806", textAlign: "center" }}>Tento byt je rezervován.</div>
-              )}
-            </>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#bbb", textAlign: "center", gap: 8 }}>
-              <div style={{ fontSize: 32 }}>👆</div>
-              <div style={{ fontSize: 14 }}>Klikněte na volný byt</div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -187,84 +286,90 @@ function ReservationForm({ project, unit, onBack, onSuccess }) {
 
   const Field = ({ id, label, type = "text", placeholder }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
+      <label style={{ fontSize: 12, color: "#667788", fontWeight: 500 }}>{label}</label>
       <input type={type} value={form[id]} placeholder={placeholder}
         onChange={e => { setForm(f => ({ ...f, [id]: e.target.value })); setErrors(er => ({ ...er, [id]: "" })); }}
-        style={{ padding: "9px 12px", borderRadius: 8, fontSize: 13, border: errors[id] ? "1px solid #E24B4A" : "0.5px solid #ddd", background: "#fafafa", color: "#1a1a1a" }} />
+        style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13, border: errors[id] ? "1.5px solid #E24B4A" : "1px solid #D0D8E8", background: "#F8FAFE", color: "#0D2137", outline: "none" }}
+      />
       {errors[id] && <span style={{ fontSize: 11, color: "#E24B4A" }}>{errors[id]}</span>}
     </div>
   );
 
   if (submitted) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400, gap: 16, padding: 40, textAlign: "center" }}>
-      <div style={{ fontSize: 56 }}>✅</div>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>Rezervace odeslána!</div>
-      <div style={{ fontSize: 14, color: "#666", maxWidth: 380, lineHeight: 1.6 }}>
+    <div style={{ minHeight: "100vh", background: "#F4F7FC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, textAlign: "center" }}>
+      <div style={{ fontSize: 64 }}>✅</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: "#0D2137" }}>Rezervace odeslána!</div>
+      <div style={{ fontSize: 14, color: "#667788", maxWidth: 380, lineHeight: 1.7 }}>
         Byt č. <strong>{unit.unit_number}</strong> v projektu <strong>{project.name}</strong> je rezervován na 48 hodin. Kontaktujeme vás na <strong>{form.email}</strong>.
       </div>
-      <button onClick={onSuccess} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      <button onClick={onSuccess} style={{ marginTop: 8, background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 12, padding: "13px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
         Zpět na projekty
       </button>
     </div>
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <div style={{ background: "#04342C", padding: "16px 20px" }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#9FE1CB", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 8 }}>← Zpět</button>
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Rezervace · {project.name} · Byt č. {unit.unit_number}</div>
+    <div style={{ minHeight: "100vh", background: "#F4F7FC" }}>
+      <div style={{ background: "#0D2137", padding: "16px 20px", display: "flex", alignItems: "center", gap: 16 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#7AA8D8", fontSize: 13, cursor: "pointer", padding: 0 }}>← Zpět</button>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>Rezervace · {project.name} · Byt č. {unit.unit_number}</div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", background: "#f7f7f5" }}>
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Kontaktní údaje</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field id="jmeno" label="Jméno *" placeholder="Jan" />
-            <Field id="prijmeni" label="Příjmení *" placeholder="Novák" />
-            <Field id="email" label="E-mail *" type="email" placeholder="jan@email.cz" />
-            <Field id="telefon" label="Telefon *" placeholder="+420 777 000 000" />
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px", display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137", marginBottom: 16 }}>Kontaktní údaje</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field id="jmeno" label="Jméno *" placeholder="Jan" />
+              <Field id="prijmeni" label="Příjmení *" placeholder="Novák" />
+              <Field id="email" label="E-mail *" type="email" placeholder="jan@email.cz" />
+              <Field id="telefon" label="Telefon *" placeholder="+420 777 000 000" />
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Financování</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137", marginBottom: 14 }}>Způsob financování</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[["vlastni", "Vlastní prostředky"], ["hypoteka", "Hypotéka"], ["kombinace", "Kombinace"]].map(([val, lbl]) => (
-                <label key={val} style={{ display: "flex", alignItems: "center", gap: 10, background: form.financovani === val ? "#E1F5EE" : "#fff", border: form.financovani === val ? "1.5px solid #1D9E75" : "0.5px solid #ddd", borderRadius: 10, padding: "11px 14px", cursor: "pointer" }}>
-                  <input type="radio" name="fin" checked={form.financovani === val} onChange={() => setForm(f => ({ ...f, financovani: val }))} style={{ accentColor: "#1D9E75" }} />
-                  <span style={{ fontSize: 13 }}>{lbl}</span>
+                <label key={val} style={{ display: "flex", alignItems: "center", gap: 10, background: form.financovani === val ? "#EEF3FA" : "#F8FAFE", border: form.financovani === val ? "1.5px solid #1A3A6B" : "1px solid #D0D8E8", borderRadius: 10, padding: "12px 16px", cursor: "pointer" }}>
+                  <input type="radio" name="fin" checked={form.financovani === val} onChange={() => setForm(f => ({ ...f, financovani: val }))} style={{ accentColor: "#1A3A6B" }} />
+                  <span style={{ fontSize: 14, color: "#0D2137" }}>{lbl}</span>
                 </label>
               ))}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámka</label>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+            <label style={{ fontSize: 12, color: "#667788", fontWeight: 500 }}>Poznámka (volitelné)</label>
             <textarea value={form.poznamka} onChange={e => setForm(f => ({ ...f, poznamka: e.target.value }))}
-              style={{ padding: "9px 12px", borderRadius: 8, fontSize: 13, border: "0.5px solid #ddd", background: "#fafafa", resize: "none", height: 80 }} />
+              style={{ width: "100%", marginTop: 6, padding: "10px 14px", borderRadius: 10, fontSize: 13, border: "1px solid #D0D8E8", background: "#F8FAFE", resize: "none", height: 90, boxSizing: "border-box", color: "#0D2137" }} />
           </div>
         </div>
-        <div style={{ background: "#fff", borderLeft: "0.5px solid #e8e8e8", padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Shrnutí</div>
-          <div style={{ background: "#f7f7f5", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{project.name}</div>
-            <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>📍 {project.address}</div>
-            <div style={{ borderTop: "0.5px solid #eee", margin: "10px 0" }} />
-            {[["Byt č.", `${unit.unit_number} · ${unit.disp}`], ["Plocha", `${unit.area} m²`], ["Patro", `${unit.floor}. patro`]].map(([l, v]) => (
-              <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}>
-                <span style={{ color: "#888" }}>{l}</span><span style={{ fontWeight: 500 }}>{v}</span>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", boxShadow: "0 2px 8px rgba(10,30,60,0.06)", border: "1px solid #E8EDF5" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0D2137", marginBottom: 14 }}>Shrnutí</div>
+            <div style={{ background: "#F4F7FC", borderRadius: 10, padding: 14, marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0D2137" }}>{project.name}</div>
+              <div style={{ fontSize: 12, color: "#8899AA", marginTop: 2 }}>📍 {project.address}</div>
+              <div style={{ borderTop: "1px solid #E8EDF5", margin: "10px 0" }} />
+              {[["Byt č.", `${unit.unit_number} · ${unit.disp}`], ["Plocha", `${unit.area} m²`], ["Patro", `${unit.floor}. patro`]].map(([l, v]) => (
+                <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: "#8899AA" }}>{l}</span><span style={{ fontWeight: 600, color: "#0D2137" }}>{v}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: "1px solid #E8EDF5", margin: "10px 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17 }}>
+                <span style={{ color: "#8899AA" }}>Cena</span>
+                <span style={{ fontWeight: 800, color: "#1A3A6B" }}>{fmt(unit.price)}</span>
               </div>
-            ))}
-            <div style={{ borderTop: "0.5px solid #eee", margin: "10px 0" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16 }}>
-              <span style={{ color: "#888" }}>Cena</span>
-              <span style={{ fontWeight: 700, color: "#1D9E75" }}>{fmt(unit.price)}</span>
             </div>
+            <div style={{ background: "#EEF3FA", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A3A6B", marginBottom: 4 }}>Co se stane dál?</div>
+              <div style={{ fontSize: 12, color: "#1A3A6B", lineHeight: 1.6 }}>Byt bude rezervován na 48 hodin. Kontaktujeme vás do 2 hodin.</div>
+            </div>
+            <button onClick={submit} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", width: "100%" }}>
+              Odeslat rezervaci
+            </button>
+            <div style={{ fontSize: 11, color: "#AABBCC", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>Odesláním souhlasíte se zpracováním osobních údajů dle GDPR.</div>
           </div>
-          <div style={{ background: "#E1F5EE", borderRadius: 10, padding: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#0F6E56", marginBottom: 4 }}>Co se stane dál?</div>
-            <div style={{ fontSize: 12, color: "#0F6E56", lineHeight: 1.6 }}>Byt bude rezervován na 48 hodin. Kontaktujeme vás do 2 hodin.</div>
-          </div>
-          <button onClick={submit} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-            📅 Odeslat rezervaci
-          </button>
-          <div style={{ fontSize: 11, color: "#bbb", textAlign: "center" }}>Odesláním souhlasíte se zpracováním osobních údajů dle GDPR.</div>
         </div>
       </div>
     </div>
@@ -291,34 +396,36 @@ export default function App() {
   if (isAdmin) return <Admin />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f7f5", fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
-      <div style={{ background: "#fff", borderBottom: "0.5px solid #e8e8e8", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => { setView("list"); setSelectedProject(null); }}>
-          <div style={{ width: 30, height: 30, background: "#1D9E75", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🏗</div>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>DeveloperX</span>
+    <div style={{ minHeight: "100vh", background: "#F4F7FC", fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
+      <div style={{ background: "#0D2137", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => { setView("list"); setSelectedProject(null); }}>
+          <div style={{ width: 32, height: 32, background: "#1A3A6B", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🏗</div>
+          <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>DeveloperX</span>
         </div>
-        <div style={{ display: "flex", gap: 20, fontSize: 13, color: "#666", alignItems: "center" }}>
-          <span>O nás</span>
-          <span>Reference</span>
-          <span>Kontakt</span>
-          <button style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📞 Zavolat nám</button>
+        <div style={{ display: "flex", gap: 24, fontSize: 14, color: "#7AA8D8", alignItems: "center" }}>
+          <span style={{ cursor: "pointer" }}>O nás</span>
+          <span style={{ cursor: "pointer" }}>Reference</span>
+          <span style={{ cursor: "pointer" }}>Kontakt</span>
+          <button style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📞 Zavolat nám</button>
         </div>
       </div>
 
       {view === "list" && (
         <>
-          <div style={{ background: "#04342C", padding: "40px 24px 32px", textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: "#5DCAA5", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Developerské projekty</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Vyberte svůj nový domov</div>
-            <div style={{ fontSize: 14, color: "#9FE1CB" }}>{projects.length} projektů · novostavby i rekonstrukce</div>
+          <div style={{ background: "linear-gradient(135deg, #0D2137 0%, #1A3A6B 100%)", padding: "60px 28px 50px", textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: "#7AA8D8", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12, fontWeight: 600 }}>Developerské projekty</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 12, lineHeight: 1.2 }}>Vyberte svůj nový domov</div>
+            <div style={{ fontSize: 15, color: "#7AA8D8" }}>{projects.length} projektů · novostavby i rekonstrukce</div>
           </div>
-          <div style={{ padding: "20px 24px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
             {loading ? (
-              <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Načítám projekty...</div>
+              <div style={{ textAlign: "center", color: "#AABBCC", padding: 60, fontSize: 15 }}>Načítám projekty...</div>
             ) : projects.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné projekty. Přidejte je v <a href="#admin" style={{ color: "#1D9E75" }}>admin panelu</a>.</div>
+              <div style={{ textAlign: "center", color: "#AABBCC", padding: 60, fontSize: 15 }}>
+                Žádné projekty. Přidejte je v <a href="#admin" style={{ color: "#1A3A6B" }}>admin panelu</a>.
+              </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22 }}>
                 {projects.map(p => <ProjectCard key={p.id} project={p} onClick={proj => { setSelectedProject(proj); setView("detail"); }} />)}
               </div>
             )}
