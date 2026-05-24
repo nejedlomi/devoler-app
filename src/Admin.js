@@ -111,6 +111,9 @@ export default function Admin() {
   const [authed, setAuthed] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [userForm, setUserForm] = useState({});
   const [projects, setProjects] = useState([]);
   const [view, setView] = useState("projects");
   const [selectedProject, setSelectedProject] = useState(null);
@@ -256,6 +259,27 @@ export default function Admin() {
   const loadDismissedAlerts = async () => {
     const { data } = await supabase.from("dismissed_alerts").select("alert_key");
     setDismissedAlerts((data || []).map(d => d.alert_key));
+  };
+
+  const loadAdminUsers = async () => {
+    const { data } = await supabase.from("admin_users").select("id, username, full_name, email, role");
+    setAdminUsers(data || []);
+  };
+
+  const saveAdminUser = async () => {
+    const { id, ...data } = userForm;
+    if (id && !data.password) delete data.password;
+    if (id) { await supabase.from("admin_users").update(data).eq("id", id); }
+    else { await supabase.from("admin_users").insert(data); }
+    setUserForm({});
+    loadAdminUsers();
+  };
+
+  const deleteAdminUser = async (id) => {
+    if (id === currentUser?.id) { alert("Nemůžete smazat vlastní účet!"); return; }
+    if (!window.confirm("Smazat uživatele?")) return;
+    await supabase.from("admin_users").delete().eq("id", id);
+    loadAdminUsers();
   };
 
   const dismissAlert = async (key) => {
@@ -497,7 +521,7 @@ export default function Admin() {
   const login = async () => {
     const { data, error } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password);
     console.log("Login result:", data, error);
-    if (data && data.length > 0) { setAuthed(true); setLoginError(""); }
+    if (data && data.length > 0) { setAuthed(true); setCurrentUser(data[0]); setLoginError(""); }
     else { setLoginError("Špatné jméno nebo heslo"); }
   };
 
@@ -544,6 +568,9 @@ export default function Admin() {
           <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
           <button onClick={() => loadDocuments()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📁 Dokumenty</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
+          {currentUser?.role === "admin" && (
+            <button onClick={() => { loadAdminUsers(); setView("users"); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👤 Uživatelé</button>
+          )}
           <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
         </div>
       </div>
@@ -1911,6 +1938,79 @@ export default function Admin() {
               <button onClick={() => { setView("documents"); setDocumentForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
+        )}
+
+        {/* UŽIVATELÉ */}
+        {!loading && view === "users" && currentUser?.role === "admin" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Uživatelé ({adminUsers.length})</div>
+              <button onClick={() => setUserForm({ role: "agent" })} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový uživatel</button>
+            </div>
+
+            {userForm.role !== undefined && (
+              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 14 }}>{userForm.id ? "Upravit uživatele" : "Nový uživatel"}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Celé jméno</label>
+                    <input type="text" value={userForm.full_name || ""} onChange={e => setUserForm(f => ({ ...f, full_name: e.target.value }))}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Uživatelské jméno *</label>
+                    <input type="text" value={userForm.username || ""} onChange={e => setUserForm(f => ({ ...f, username: e.target.value }))}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Heslo {userForm.id ? "(prázdné = beze změny)" : "*"}</label>
+                    <input type="password" value={userForm.password || ""} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>E-mail</label>
+                    <input type="email" value={userForm.email || ""} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Role</label>
+                    <select value={userForm.role || "agent"} onChange={e => setUserForm(f => ({ ...f, role: e.target.value }))}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                      <option value="admin">Admin — plný přístup</option>
+                      <option value="agent">Makléř — omezený přístup</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                  <button onClick={saveAdminUser} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+                  <button onClick={() => setUserForm({})} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {adminUsers.map(u => (
+                <div key={u.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{u.full_name || u.username}</div>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: u.role === "admin" ? "#EEF3FA" : "#E1F5EE", color: u.role === "admin" ? "#1A3A6B" : "#0F6E56", fontWeight: 500 }}>
+                        {u.role === "admin" ? "Admin" : "Makléř"}
+                      </span>
+                      {u.id === currentUser?.id && <span style={{ fontSize: 10, color: "#aaa" }}>(vy)</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>@{u.username}{u.email && ` · ${u.email}`}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setUserForm(u)} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                    {u.id !== currentUser?.id && (
+                      <button onClick={() => deleteAdminUser(u.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* NASTAVENÍ */}
