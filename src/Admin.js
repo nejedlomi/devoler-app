@@ -525,7 +525,22 @@ export default function Admin() {
         {/* DASHBOARD */}
         {!loading && view === "dashboard" && (
           <>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>Dashboard</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Dashboard</div>
+              <button onClick={async () => {
+                const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/send-expiry-alert", {
+                  headers: { "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE` }
+                });
+                const data = await res.json();
+                if (data.count === 0) {
+                  alert("Žádné expirující rezervace v příštích 3 dnech.");
+                } else {
+                  alert(`⚠️ ${data.count} expirujících rezervací:\n${data.alerts.map(a => `• ${a.contact} — expiruje ${a.valid_until}`).join("\n")}`);
+                }
+              }} style={{ background: "#FAEEDA", color: "#633806", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                🔔 Zkontrolovat expirující rezervace
+              </button>
+            </div>
 
             {(() => {
               const today = new Date();
