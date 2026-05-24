@@ -135,6 +135,9 @@ export default function Admin() {
   const [documentForm, setDocumentForm] = useState({});
   const [documentSearch, setDocumentSearch] = useState("");
   const [documentFilter, setDocumentFilter] = useState("all");
+  const [tasks, setTasks] = useState([]);
+  const [taskForm, setTaskForm] = useState({});
+  const [taskFilter, setTaskFilter] = useState("today");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -280,6 +283,35 @@ export default function Admin() {
     if (!window.confirm("Smazat uživatele?")) return;
     await supabase.from("admin_users").delete().eq("id", id);
     loadAdminUsers();
+  };
+
+  const loadTasks = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("tasks")
+      .select("*, projects(name), units(unit_number, disp), contacts(name)")
+      .order("due_date", { ascending: true });
+    setTasks(data || []);
+    setLoading(false);
+    setView("tasks");
+  };
+
+  const saveTask = async () => {
+    const { id, projects, units, contacts, ...data } = taskForm;
+    if (id) { await supabase.from("tasks").update(data).eq("id", id); }
+    else { await supabase.from("tasks").insert(data); }
+    setTaskForm({});
+    loadTasks();
+  };
+
+  const deleteTask = async (id) => {
+    if (!window.confirm("Smazat úkol?")) return;
+    await supabase.from("tasks").delete().eq("id", id);
+    loadTasks();
+  };
+
+  const completeTask = async (id) => {
+    await supabase.from("tasks").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", id);
+    loadTasks();
   };
 
   const dismissAlert = async (key) => {
@@ -567,6 +599,7 @@ export default function Admin() {
           <button onClick={() => loadLeads()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🎯 Pipeline</button>
           <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
           <button onClick={() => loadDocuments()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📁 Dokumenty</button>
+          <button onClick={() => loadTasks()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>✅ Úkoly</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
           {currentUser?.role === "admin" && (
             <button onClick={() => { loadAdminUsers(); setView("users"); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👤 Uživatelé</button>
@@ -2033,6 +2066,157 @@ export default function Admin() {
               ))}
             </div>
           </>
+        )}
+
+        {/* ÚKOLY */}
+        {!loading && view === "tasks" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Úkoly</div>
+              <button onClick={() => { setTaskForm({ priority: "medium", status: "todo" }); setView("editTask"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový úkol</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              {[
+                ["today", "📅 Dnes"],
+                ["week", "📆 Tento týden"],
+                ["todo", "🔵 Nesplněné"],
+                ["done", "✅ Splněné"],
+                ["all", "Vše"],
+              ].map(([f, l]) => (
+                <button key={f} onClick={() => setTaskFilter(f)} style={{
+                  padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer",
+                  border: "0.5px solid #ddd",
+                  background: taskFilter === f ? "#1D9E75" : "#fff",
+                  color: taskFilter === f ? "#fff" : "#555",
+                }}>{l}</button>
+              ))}
+            </div>
+
+            {taskFilter === "today" && (() => {
+              const today = new Date().toISOString().split("T")[0];
+              const todayTasks = tasks.filter(t => t.due_date === today && t.status !== "done");
+              const overdue = tasks.filter(t => t.due_date < today && t.status !== "done");
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  {overdue.length > 0 && (
+                    <div style={{ background: "#FCEBEB", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#A32D2D", marginBottom: 6 }}>⚠️ Po termínu ({overdue.length})</div>
+                      {overdue.map(t => (
+                        <div key={t.id} style={{ fontSize: 13, color: "#A32D2D", marginBottom: 4 }}>• {t.title} — {t.due_date}</div>
+                      ))}
+                    </div>
+                  )}
+                  {todayTasks.length === 0 && overdue.length === 0 && (
+                    <div style={{ textAlign: "center", color: "#aaa", padding: 20 }}>🎉 Dnes nemáte žádné úkoly!</div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {tasks.filter(t => {
+                const today = new Date().toISOString().split("T")[0];
+                const weekEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+                if (taskFilter === "today") return t.due_date === today && t.status !== "done";
+                if (taskFilter === "week") return t.due_date <= weekEnd && t.status !== "done";
+                if (taskFilter === "todo") return t.status !== "done";
+                if (taskFilter === "done") return t.status === "done";
+                return true;
+              }).map(t => {
+                const today = new Date().toISOString().split("T")[0];
+                const isOverdue = t.due_date < today && t.status !== "done";
+                const priorityColors = { high: "#E24B4A", medium: "#EF9F27", low: "#1D9E75" };
+                const priorityLabels = { high: "Vysoká", medium: "Střední", low: "Nízká" };
+                return (
+                  <div key={t.id} style={{ background: "#fff", border: `0.5px solid ${isOverdue ? "#E24B4A" : "#e8e8e8"}`, borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <button onClick={() => completeTask(t.id)} style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${t.status === "done" ? "#1D9E75" : "#ddd"}`, background: t.status === "done" ? "#1D9E75" : "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff" }}>
+                      {t.status === "done" ? "✓" : ""}
+                    </button>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: t.status === "done" ? "#aaa" : "#1a1a1a", textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</div>
+                        <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: priorityColors[t.priority] + "20", color: priorityColors[t.priority], fontWeight: 600 }}>
+                          {priorityLabels[t.priority]}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999" }}>
+                        {t.due_date && `📅 ${t.due_date}`}
+                        {t.assigned_to && ` · 👤 ${t.assigned_to}`}
+                        {t.projects?.name && ` · 🏗 ${t.projects.name}`}
+                        {t.contacts?.name && ` · 👤 ${t.contacts.name}`}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => { setTaskForm(t); setView("editTask"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                      <button onClick={() => deleteTask(t.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>×</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {tasks.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné úkoly.</div>}
+            </div>
+          </>
+        )}
+
+        {/* EDIT ÚKOL */}
+        {!loading && view === "editTask" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <button onClick={() => { setView("tasks"); setTaskForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Úkoly</button>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{taskForm.id ? "Upravit úkol" : "Nový úkol"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Název úkolu *</label>
+                <input type="text" value={taskForm.title || ""} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Termín</label>
+                <input type="date" value={taskForm.due_date || ""} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Priorita</label>
+                <select value={taskForm.priority || "medium"} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="high">🔴 Vysoká</option>
+                  <option value="medium">🟡 Střední</option>
+                  <option value="low">🟢 Nízká</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Odpovědná osoba</label>
+                <input type="text" value={taskForm.assigned_to || ""} onChange={e => setTaskForm(f => ({ ...f, assigned_to: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Projekt</label>
+                <select value={taskForm.project_id || ""} onChange={e => setTaskForm(f => ({ ...f, project_id: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez projektu --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt</label>
+                <select value={taskForm.contact_id || ""} onChange={e => setTaskForm(f => ({ ...f, contact_id: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez kontaktu --</option>
+                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Popis</label>
+                <textarea value={taskForm.description || ""} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveTask} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+              {taskForm.id && <button onClick={() => deleteTask(taskForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
+              <button onClick={() => { setView("tasks"); setTaskForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
         )}
 
         {/* NASTAVENÍ */}
