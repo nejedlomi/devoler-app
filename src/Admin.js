@@ -28,6 +28,10 @@ export default function Admin() {
   const [contacts, setContacts] = useState([]);
   const [contactForm, setContactForm] = useState({});
   const [contactSearch, setContactSearch] = useState("");
+  const [leads, setLeads] = useState([]);
+  const [leadForm, setLeadForm] = useState({});
+  const [reservations, setReservations] = useState([]);
+  const [reservationForm, setReservationForm] = useState({});
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -222,6 +226,48 @@ export default function Admin() {
     loadContacts();
   };
 
+  const loadLeads = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("leads").select("*, contacts(name, phone, email), projects(name)").order("created_at", { ascending: false });
+    setLeads(data || []);
+    setLoading(false);
+    setView("leads");
+  };
+
+  const saveLead = async () => {
+    if (leadForm.id) { await supabase.from("leads").update(leadForm).eq("id", leadForm.id); }
+    else { await supabase.from("leads").insert(leadForm); }
+    setLeadForm({});
+    loadLeads();
+  };
+
+  const deleteLead = async (id) => {
+    if (!window.confirm("Smazat lead?")) return;
+    await supabase.from("leads").delete().eq("id", id);
+    loadLeads();
+  };
+
+  const loadReservations = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("reservations").select("*, contacts(name, phone), units(unit_number, disp, area), units(projects(name))").order("created_at", { ascending: false });
+    setReservations(data || []);
+    setLoading(false);
+    setView("reservations");
+  };
+
+  const saveReservation = async () => {
+    if (reservationForm.id) { await supabase.from("reservations").update(reservationForm).eq("id", reservationForm.id); }
+    else { await supabase.from("reservations").insert(reservationForm); }
+    setReservationForm({});
+    loadReservations();
+  };
+
+  const deleteReservation = async (id) => {
+    if (!window.confirm("Smazat rezervaci?")) return;
+    await supabase.from("reservations").delete().eq("id", id);
+    loadReservations();
+  };
+
   const Input = ({ label, field, type, obj, setObj, span }) => {
     const [localVal, setLocalVal] = useState(obj[field] || "");
     return (
@@ -308,6 +354,8 @@ export default function Admin() {
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button onClick={() => setView("dashboard")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📊 Dashboard</button>
           <button onClick={() => { loadContacts(); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👥 Kontakty</button>
+          <button onClick={() => loadLeads()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🎯 Pipeline</button>
+          <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
           <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
           <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
         </div>
@@ -1179,6 +1227,220 @@ export default function Admin() {
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveContact} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+
+        {/* PIPELINE - LEADS */}
+        {!loading && view === "leads" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Obchodní pipeline ({leads.length})</div>
+              <button onClick={() => { setLeadForm({}); setView("editLead"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový lead</button>
+            </div>
+
+            {/* Kanban pipeline */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10, marginBottom: 20, overflowX: "auto" }}>
+              {[
+                ["new", "Nový", "#EEF3FA", "#1A3A6B"],
+                ["contacted", "Kontaktován", "#FFF8E6", "#7A4A0A"],
+                ["viewing", "Prohlídka", "#F0EFFE", "#4A3A9A"],
+                ["reservation", "Rezervace", "#E1F5EE", "#0F6E56"],
+                ["contract", "Smlouva", "#E8F5E9", "#1B5E20"],
+                ["closed", "Uzavřeno", "#E8F5E9", "#1B5E20"],
+                ["lost", "Ztraceno", "#FCEBEB", "#A32D2D"],
+              ].map(([status, label, bg, color]) => {
+                const statusLeads = leads.filter(l => l.status === status);
+                return (
+                  <div key={status} style={{ background: bg, borderRadius: 10, padding: "10px 8px", minHeight: 100 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 8, textAlign: "center" }}>{label} ({statusLeads.length})</div>
+                    {statusLeads.map(l => (
+                      <div key={l.id} onClick={() => { setLeadForm(l); setView("editLead"); }} style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", marginBottom: 6, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{l.contacts?.name}</div>
+                        <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{l.projects?.name}</div>
+                        {l.preferred_disp && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{l.preferred_disp}</div>}
+                        {l.next_contact_date && (() => {
+                          const isOverdue = new Date(l.next_contact_date) < new Date();
+                          return <div style={{ fontSize: 10, color: isOverdue ? "#E24B4A" : "#aaa", marginTop: 2 }}>📅 {l.next_contact_date}</div>;
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* EDIT LEAD */}
+        {!loading && view === "editLead" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <button onClick={() => { setView("leads"); setLeadForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Pipeline</button>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{leadForm.id ? "Upravit lead" : "Nový lead"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt *</label>
+                <select value={leadForm.contact_id || ""} onChange={e => setLeadForm(f => ({ ...f, contact_id: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- vyberte kontakt --</option>
+                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Projekt</label>
+                <select value={leadForm.project_id || ""} onChange={e => setLeadForm(f => ({ ...f, project_id: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez projektu --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Preferovaná dispozice</label>
+                <select value={leadForm.preferred_disp || ""} onChange={e => setLeadForm(f => ({ ...f, preferred_disp: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- vše --</option>
+                  {["1+kk", "2+kk", "3+kk", "4+kk"].map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Rozpočet (Kč)</label>
+                <input type="number" value={leadForm.budget || ""} onChange={e => setLeadForm(f => ({ ...f, budget: parseInt(e.target.value) || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav leadu</label>
+                <select value={leadForm.status || "new"} onChange={e => setLeadForm(f => ({ ...f, status: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="new">Nový</option>
+                  <option value="contacted">Kontaktován</option>
+                  <option value="viewing">Prohlídka</option>
+                  <option value="reservation">Rezervace</option>
+                  <option value="contract">Smlouva</option>
+                  <option value="closed">Uzavřeno</option>
+                  <option value="lost">Ztraceno</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Přiřazený obchodník</label>
+                <input type="text" value={leadForm.assigned_to || ""} onChange={e => setLeadForm(f => ({ ...f, assigned_to: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Pravděpodobnost uzavření (%)</label>
+                <input type="number" min="0" max="100" value={leadForm.probability || 0} onChange={e => setLeadForm(f => ({ ...f, probability: parseInt(e.target.value) || 0 }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Termín dalšího kontaktu</label>
+                <input type="date" value={leadForm.next_contact_date || ""} onChange={e => setLeadForm(f => ({ ...f, next_contact_date: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Další krok</label>
+                <input type="text" value={leadForm.next_step || ""} onChange={e => setLeadForm(f => ({ ...f, next_step: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
+                <textarea value={leadForm.notes || ""} onChange={e => setLeadForm(f => ({ ...f, notes: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveLead} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+              {leadForm.id && <button onClick={() => deleteLead(leadForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
+              <button onClick={() => { setView("leads"); setLeadForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+
+        {/* REZERVACE */}
+        {!loading && view === "reservations" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Rezervace ({reservations.length})</div>
+              <button onClick={() => { setReservationForm({}); setView("editReservation"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nová rezervace</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {reservations.map(r => {
+                const isExpiring = r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000;
+                const isExpired = r.valid_until && new Date(r.valid_until) < new Date();
+                return (
+                  <div key={r.id} style={{ background: "#fff", border: `0.5px solid ${isExpired ? "#E24B4A" : isExpiring ? "#EF9F27" : "#e8e8e8"}`, borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{r.contacts?.name}</div>
+                        {isExpired && <span style={{ fontSize: 10, background: "#FCEBEB", color: "#A32D2D", padding: "2px 8px", borderRadius: 20 }}>Expirováno</span>}
+                        {isExpiring && !isExpired && <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>Brzy expiruje</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999" }}>
+                        Byt č. {r.units?.unit_number} · {r.units?.disp} · {r.units?.area} m²
+                        {r.reserved_at && ` · Rezervováno: ${r.reserved_at}`}
+                        {r.valid_until && ` · Platnost do: ${r.valid_until}`}
+                      </div>
+                      {r.reservation_fee && <div style={{ fontSize: 12, color: "#1D9E75", marginTop: 2, fontWeight: 600 }}>Záloha: {r.reservation_fee.toLocaleString("cs-CZ")} Kč</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { setReservationForm(r); setView("editReservation"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                      <button onClick={() => deleteReservation(r.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {reservations.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné rezervace.</div>}
+            </div>
+          </>
+        )}
+
+        {/* EDIT REZERVACE */}
+        {!loading && view === "editReservation" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Rezervace</button>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{reservationForm.id ? "Upravit rezervaci" : "Nová rezervace"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt *</label>
+                <select value={reservationForm.contact_id || ""} onChange={e => setReservationForm(f => ({ ...f, contact_id: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- vyberte kontakt --</option>
+                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
+                <select value={reservationForm.status || "active"} onChange={e => setReservationForm(f => ({ ...f, status: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="active">Aktivní</option>
+                  <option value="expired">Expirovaná</option>
+                  <option value="converted">Převedena na smlouvu</option>
+                  <option value="cancelled">Zrušena</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Datum rezervace</label>
+                <input type="date" value={reservationForm.reserved_at || ""} onChange={e => setReservationForm(f => ({ ...f, reserved_at: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Platnost do</label>
+                <input type="date" value={reservationForm.valid_until || ""} onChange={e => setReservationForm(f => ({ ...f, valid_until: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Rezervační poplatek (Kč)</label>
+                <input type="number" value={reservationForm.reservation_fee || ""} onChange={e => setReservationForm(f => ({ ...f, reservation_fee: parseInt(e.target.value) || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
+                <textarea value={reservationForm.notes || ""} onChange={e => setReservationForm(f => ({ ...f, notes: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveReservation} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
+              {reservationForm.id && <button onClick={() => deleteReservation(reservationForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
+              <button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
         )}
