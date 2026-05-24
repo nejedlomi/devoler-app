@@ -18,6 +18,7 @@ export default function Admin() {
   const [projects, setProjects] = useState([]);
   const [view, setView] = useState("projects");
   const [selectedProject, setSelectedProject] = useState(null);
+  const [filterDisp, setFilterDisp] = useState("Vše");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -259,7 +260,7 @@ export default function Admin() {
                     <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{p.location} · od {p.price_from?.toLocaleString("cs-CZ")} Kč · {p.total_units} bytů</div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => loadUnits(p)} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
+                    <button onClick={() => { setFilterDisp("Vše"); loadUnits(p); }} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
                     <button onClick={() => { setForm(p); setView("editProject"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
                     <button onClick={() => deleteProject(p.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
                   </div>
@@ -429,9 +430,26 @@ export default function Admin() {
               </div>
               <button onClick={() => { setUnitForm({}); setView("editUnit"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový byt</button>
             </div>
+            {(() => {
+              const dispTypes = ["Vše", ...new Set(selectedProject.units?.map(u => u.disp).filter(Boolean))];
+              return (
+                <>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+                    {dispTypes.map(d => (
+                      <button key={d} onClick={() => setFilterDisp(d)} style={{
+                        border: filterDisp === d ? "none" : "0.5px solid #ddd",
+                        borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer",
+                        background: filterDisp === d ? "#1D9E75" : "#fff",
+                        color: filterDisp === d ? "#fff" : "#555",
+                      }}>{d}</button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
             {selectedProject.units?.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné byty.</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {selectedProject.units?.map(u => {
+              {(filterDisp === "Vše" ? selectedProject.units : selectedProject.units?.filter(u => u.disp === filterDisp))?.map(u => {
                 const sc = statusColor(u.status);
                 return (
                   <div key={u.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
