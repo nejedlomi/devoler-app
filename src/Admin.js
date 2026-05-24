@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
 import * as XLSX from "xlsx";
-import { generateUnitPDF } from "./UnitPDF";
 
 function Section({ title, first, children }) {
   return (
@@ -26,6 +25,8 @@ export default function Admin() {
   const [unitForm, setUnitForm] = useState({});
   const [suggestions, setSuggestions] = useState([]);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState(null);
+  const [pdfEditor, setPdfEditor] = useState(null);
   const [settings, setSettings] = useState({});
   const [settingsLoading, setSettingsLoading] = useState(false);
   const mapRef = useRef(null);
@@ -338,6 +339,21 @@ export default function Admin() {
             </div>
 
             <div style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Logo firmy</label>
+              <input type="file" accept="image/*" onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const fileName = `logos/${Date.now()}-${file.name}`;
+                const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+                if (!error) {
+                  const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
+                  setForm(f => ({ ...f, company_logo: urlData.publicUrl }));
+                }
+              }} style={{ marginTop: 6, fontSize: 13 }} />
+              {form.company_logo && <img src={form.company_logo} alt="Logo" style={{ height: 50, objectFit: "contain", marginTop: 8 }} />}
+            </div>
+
+            <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotky projektu</label>
               <input type="file" accept="image/*" multiple onChange={async (e) => {
                 const files = Array.from(e.target.files);
@@ -517,7 +533,19 @@ export default function Admin() {
                       {u.buyer && <div style={{ fontSize: 12, color: "#999" }}>👤 {u.buyer}</div>}
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => generateUnitPDF(selectedProject, u)} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>
+                      <button onClick={() => setPdfEditor({
+                        project: selectedProject,
+                        unit: u,
+                        agentPhotoSize: 100,
+                        agentPhotoShape: "circle",
+                        template: "minimal",
+                        colorHeader: "#04342C",
+                        colorPrice: "#04342C",
+                        colorAccent: "#1D9E75",
+                        photosPosition: "top",
+                        agentPosition: "bottom",
+                        priceSize: "large",
+                      })} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>
                         📄 PDF
                       </button>
                       <button onClick={() => { setUnitForm(u); setView("editUnit"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
@@ -626,6 +654,46 @@ export default function Admin() {
             <Section title="Stav a obchod">
               <Select label="Stav jednotky" field="status" options={["available", "reserved", "sold", "blocked", "withdrawn"]} obj={unitForm} setObj={setUnitForm} />
               <Input label="Kupující / zájemce" field="buyer" obj={unitForm} setObj={setUnitForm} />
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — jméno</label>
+                <input type="text" value={unitForm.agent_name || ""} onChange={e => setUnitForm(f => ({ ...f, agent_name: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — telefon</label>
+                <input type="text" value={unitForm.agent_phone || ""} onChange={e => setUnitForm(f => ({ ...f, agent_phone: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — email</label>
+                <input type="text" value={unitForm.agent_email || ""} onChange={e => setUnitForm(f => ({ ...f, agent_email: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — webové stránky</label>
+                <input type="text" value={unitForm.agent_web || ""} onChange={e => setUnitForm(f => ({ ...f, agent_web: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotka makléře</label>
+                {unitForm.agent_photo && (
+                  <button onClick={() => setUnitForm(f => ({ ...f, agent_photo: "" }))}
+                    style={{ fontSize: 12, color: "#E24B4A", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 6 }}>
+                    × Odebrat fotku
+                  </button>
+                )}
+                <input type="file" accept="image/*" onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const fileName = `agents/${Date.now()}-${file.name}`;
+                  const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+                  if (!error) {
+                    const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
+                    setUnitForm(f => ({ ...f, agent_photo: urlData.publicUrl }));
+                  }
+                }} style={{ fontSize: 13 }} />
+                {unitForm.agent_photo && <img src={unitForm.agent_photo} alt="Makler" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%", marginTop: 6 }} />}
+              </div>
               <Input label="Datum rezervace" field="reserved_at" type="date" obj={unitForm} setObj={setUnitForm} />
               <Input label="Datum podpisu smlouvy" field="contract_signed_at" type="date" obj={unitForm} setObj={setUnitForm} />
               <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -653,6 +721,9 @@ export default function Admin() {
                 ["hero_subtitle", "Podnadpis"],
                 ["company_name", "Název firmy"],
                 ["phone", "Telefon"],
+                ["agent_name", "Jméno makléře"],
+                ["agent_phone", "Telefon makléře"],
+                ["agent_email", "Email makléře"],
               ].map(([key, label]) => (
                 <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
@@ -660,6 +731,34 @@ export default function Admin() {
                     style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
                 </div>
               ))}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Logo firmy</label>
+              <input type="file" accept="image/*" onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const fileName = `settings/logo-${Date.now()}-${file.name}`;
+                const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+                if (!error) {
+                  const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
+                  setSettings(s => ({ ...s, company_logo: urlData.publicUrl }));
+                }
+              }} style={{ fontSize: 13 }} />
+              {settings.company_logo && <img src={settings.company_logo} alt="Logo" style={{ height: 50, objectFit: "contain", marginTop: 4 }} />}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotka makléře</label>
+              <input type="file" accept="image/*" onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const fileName = `settings/agent-${Date.now()}-${file.name}`;
+                const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+                if (!error) {
+                  const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
+                  setSettings(s => ({ ...s, agent_photo: urlData.publicUrl }));
+                }
+              }} style={{ fontSize: 13 }} />
+              {settings.agent_photo && <img src={settings.agent_photo} alt="Makler" style={{ height: 80, width: 80, objectFit: "cover", borderRadius: "50%", marginTop: 4 }} />}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={async () => {
@@ -676,6 +775,199 @@ export default function Admin() {
             </div>
           </div>
         )}
+
+      {pdfEditor && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 12, width: "95vw", maxWidth: 1100, maxHeight: "95vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>Upravit PDF nabídku</div>
+              <button onClick={() => setPdfEditor(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#999" }}>×</button>
+            </div>
+            <div style={{ padding: "18px", overflow: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {[
+                ["Název projektu", "name", "project"],
+                ["Adresa", "address", "project"],
+                ["Číslo bytu", "unit_number", "unit"],
+                ["Dispozice", "disp", "unit"],
+                ["Plocha (m²)", "area", "unit"],
+                ["Patro", "floor", "unit"],
+                ["Cena bez DPH", "price_net", "unit"],
+                ["Cena za m²", "price_per_sqm", "unit"],
+                ["Jméno makléře", "agent_name", "unit"],
+                ["Telefon makléře", "agent_phone", "unit"],
+              ].map(([label, field, obj]) => (
+                <div key={field} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
+                  <input type="text" value={pdfEditor[obj][field] || ""}
+                    onChange={e => setPdfEditor(prev => ({
+                      ...prev,
+                      [obj]: { ...prev[obj], [field]: e.target.value }
+                    }))}
+                    style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}
+                  />
+                </div>
+              ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámka pro klienta</label>
+                <textarea value={pdfEditor.unit.pdf_note || ""}
+                  onChange={e => setPdfEditor(prev => ({ ...prev, unit: { ...prev.unit, pdf_note: e.target.value } }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }}
+                  placeholder="Volitelná poznámka která se zobrazí v PDF..."
+                />
+              </div>
+            </div>
+            <div style={{ padding: "0 18px 12px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ borderTop: "0.5px solid #eee", paddingTop: 14, marginTop: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 12 }}>Design PDF</div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Šablona</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[["minimal", "Minimalistická"], ["premium", "Prémiová"], ["color", "Barevná"]].map(([val, lbl]) => (
+                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, template: val }))}
+                          style={{ flex: 1, padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
+                            background: pdfEditor.template === val ? "#1D9E75" : "#f0f0f0",
+                            color: pdfEditor.template === val ? "#fff" : "#333" }}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>Barva hlavičky</label>
+                      <input type="color" value={pdfEditor.colorHeader}
+                        onChange={e => setPdfEditor(prev => ({ ...prev, colorHeader: e.target.value }))}
+                        style={{ width: "100%", height: 36, borderRadius: 8, border: "0.5px solid #ddd", cursor: "pointer" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>Barva ceny</label>
+                      <input type="color" value={pdfEditor.colorPrice}
+                        onChange={e => setPdfEditor(prev => ({ ...prev, colorPrice: e.target.value }))}
+                        style={{ width: "100%", height: 36, borderRadius: 8, border: "0.5px solid #ddd", cursor: "pointer" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>Barva akcentu</label>
+                      <input type="color" value={pdfEditor.colorAccent}
+                        onChange={e => setPdfEditor(prev => ({ ...prev, colorAccent: e.target.value }))}
+                        style={{ width: "100%", height: 36, borderRadius: 8, border: "0.5px solid #ddd", cursor: "pointer" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Poloha fotek</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[["top", "Nahoře"], ["bottom", "Dole"], ["none", "Skrýt"]].map(([val, lbl]) => (
+                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, photosPosition: val }))}
+                          style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
+                            background: pdfEditor.photosPosition === val ? "#1D9E75" : "#f0f0f0",
+                            color: pdfEditor.photosPosition === val ? "#fff" : "#333" }}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Poloha makléře</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[["bottom", "Dole"], ["right", "Vpravo"], ["none", "Skrýt"]].map(([val, lbl]) => (
+                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, agentPosition: val }))}
+                          style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
+                            background: pdfEditor.agentPosition === val ? "#1D9E75" : "#f0f0f0",
+                            color: pdfEditor.agentPosition === val ? "#fff" : "#333" }}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Velikost ceny</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[["large", "Velká"], ["small", "Malá"]].map(([val, lbl]) => (
+                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, priceSize: val }))}
+                          style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
+                            background: pdfEditor.priceSize === val ? "#1D9E75" : "#f0f0f0",
+                            color: pdfEditor.priceSize === val ? "#fff" : "#333" }}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Velikost fotky makléře</label>
+                <input type="range" min="50" max="200" value={pdfEditor.agentPhotoSize}
+                  onChange={e => setPdfEditor(prev => ({ ...prev, agentPhotoSize: parseInt(e.target.value) }))}
+                  style={{ width: "100%" }} />
+                <div style={{ fontSize: 11, color: "#999", textAlign: "center" }}>{pdfEditor.agentPhotoSize} px</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Tvar fotky makléře</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[["circle", "Kulatá"], ["square", "Čtvercová"], ["rounded", "Zaoblená"]].map(([val, lbl]) => (
+                    <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, agentPhotoShape: val }))}
+                      style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+                        background: pdfEditor.agentPhotoShape === val ? "#1D9E75" : "#f0f0f0",
+                        color: pdfEditor.agentPhotoShape === val ? "#fff" : "#333",
+                        border: "none" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: "12px 18px", borderTop: "0.5px solid #eee", display: "flex", gap: 8 }}>
+              <button onClick={async () => {
+                const { previewUnitPDF } = await import("./UnitPDF");
+                const url = await previewUnitPDF(pdfEditor.project, pdfEditor.unit, {
+                  agentPhotoSize: pdfEditor.agentPhotoSize,
+                  agentPhotoShape: pdfEditor.agentPhotoShape,
+                  template: pdfEditor.template,
+                  colorHeader: pdfEditor.colorHeader,
+                  colorPrice: pdfEditor.colorPrice,
+                  colorAccent: pdfEditor.colorAccent,
+                  photosPosition: pdfEditor.photosPosition,
+                  agentPosition: pdfEditor.agentPosition,
+                  priceSize: pdfEditor.priceSize,
+                });
+                setPdfPreview(url);
+              }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", flex: 1 }}>
+                Zobrazit náhled
+              </button>
+              <button onClick={() => setPdfEditor(null)} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, cursor: "pointer" }}>
+                Zrušit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pdfPreview && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 12, width: "80vw", height: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "0.5px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>Náhled PDF</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setPdfPreview(null)} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, cursor: "pointer" }}>
+                  ← Upravit
+                </button>
+                <a href={pdfPreview} download="nabidka.pdf" style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
+                  Stáhnout
+                </a>
+                <button onClick={() => { setPdfPreview(null); setPdfEditor(null); }} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, cursor: "pointer" }}>
+                  Zavřít
+                </button>
+              </div>
+            </div>
+            <iframe src={pdfPreview} style={{ flex: 1, border: "none" }} title="PDF náhled" />
+          </div>
+        </div>
+      )}
 
       </div>
     </div>
