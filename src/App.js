@@ -125,7 +125,7 @@ function UnitCell({ unit, selected, onClick }) {
       <div style={{ fontSize: 11, color: "#556677", marginTop: 1 }}>{unit.disp}</div>
       <div style={{ fontSize: 10, color: "#8899AA", marginTop: 2 }}>{unit.area} m²</div>
       <div style={{ fontSize: 11, marginTop: 4, fontWeight: 600, color: unit.status === "available" ? "#0A5C42" : unit.status === "reserved" ? "#7A4A0A" : "#888" }}>
-        {unit.status === "available" ? fmt(unit.price_net || unit.price) : STATUS_LABELS[unit.status]}
+        {unit.status === "available" ? (unit.price_public === false ? "Cena na dotaz" : fmt(unit.price_net || unit.price)) : STATUS_LABELS[unit.status]}
       </div>
     </div>
   );

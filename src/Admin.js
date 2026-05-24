@@ -526,6 +526,12 @@ export default function Admin() {
                   {unitForm.price_net ? Math.round(unitForm.price_net * 1.12).toLocaleString("cs-CZ") + " Kč" : "—"}
                 </div>
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1a1a1a", cursor: "pointer", gridColumn: "1 / -1" }}>
+                <input type="checkbox" checked={unitForm.price_public !== false}
+                  onChange={e => setUnitForm(f => ({ ...f, price_public: e.target.checked }))}
+                  style={{ accentColor: "#1D9E75" }} />
+                Zobrazit cenu veřejně na webu
+              </label>
             </Section>
 
             <Section title="Fotky bytu">
