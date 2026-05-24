@@ -165,7 +165,8 @@ export default function Admin() {
   const [projects, setProjects] = useState([]);
   const [view, setView] = useState("dashboard");
   const [selectedProject, setSelectedProject] = useState(null);
-  const [loading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
   const [milestoneForm, setMilestoneForm] = useState({});
@@ -185,7 +186,8 @@ export default function Admin() {
   const [dismissedAlerts, setDismissedAlerts] = useState([]);
   const [filterDisp, setFilterDisp] = useState("Vše");
   const [filterStatus, setFilterStatus] = useState("Vše");
-  const [filterBuilding] = useState("Vše");
+  // eslint-disable-next-line no-unused-vars
+  const [filterBuilding, setFilterBuilding] = useState("Vše");
   const [filterPriceMax, setFilterPriceMax] = useState("");
   const [contactSearch, setContactSearch] = useState("");
   const [documentSearch, setDocumentSearch] = useState("");
