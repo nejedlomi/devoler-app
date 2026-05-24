@@ -150,8 +150,20 @@ export default function Admin() {
   const saveUnit = async () => {
     const pricePerM2 = unitForm.price_net && unitForm.area ? Math.round(unitForm.price_net / unitForm.area) : null;
     const data = { ...unitForm, price_per_sqm: pricePerM2 };
-    if (unitForm.id) { await supabase.from("units").update(data).eq("id", unitForm.id); }
-    else { await supabase.from("units").insert({ ...data, project_id: selectedProject.id }); }
+    if (unitForm.id) {
+      const { data: old } = await supabase.from("units").select("price_net, price_per_sqm").eq("id", unitForm.id).single();
+      await supabase.from("units").update(data).eq("id", unitForm.id);
+      if (old && (old.price_net !== unitForm.price_net)) {
+        await supabase.from("price_history").insert({
+          unit_id: unitForm.id,
+          price_net: unitForm.price_net,
+          price_per_sqm: pricePerM2,
+          changed_by: "Admin",
+        });
+      }
+    } else {
+      await supabase.from("units").insert({ ...data, project_id: selectedProject.id });
+    }
     setUnitForm({});
     loadUnits(selectedProject);
   };
@@ -309,6 +321,25 @@ export default function Admin() {
         {!loading && view === "dashboard" && (
           <>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>Dashboard</div>
+
+            {(() => {
+              const today = new Date();
+              const delayed = projects.filter(p => {
+                const proj_milestones = [];
+                return false;
+              });
+              const warnings = [];
+              if (warnings.length === 0) {
+                const delayedProjects = projects.filter(p => p.completion && new Date(p.completion.replace("Q1", "03-31").replace("Q2", "06-30").replace("Q3", "09-30").replace("Q4", "12-31")) < today);
+                delayedProjects.forEach(p => warnings.push({ type: "delayed", text: `Projekt ${p.name} má termín dokončení v minulosti` }));
+              }
+              return warnings.length > 0 ? (
+                <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#A32D2D", marginBottom: 8 }}>⚠️ Upozornění</div>
+                  {warnings.map((w, i) => <div key={i} style={{ fontSize: 13, color: "#A32D2D", marginBottom: 4 }}>• {w.text}</div>)}
+                </div>
+              ) : null;
+            })()}
 
             {/* Statistiky */}
             {(() => {
@@ -871,7 +902,29 @@ export default function Admin() {
                 <button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>{selectedProject.name} — Timeline</div>
               </div>
+              <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { setMilestoneForm({}); setView("editMilestone"); }} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový milník</button>
+              <button onClick={async () => {
+                if (!window.confirm("Přidat typické milníky projektu?")) return;
+                const typicke = [
+                  { name: "Akvizice pozemku", order_index: 0 },
+                  { name: "Studie proveditelnosti", order_index: 1 },
+                  { name: "Dokumentace pro povolení", order_index: 2 },
+                  { name: "Stavební povolení", order_index: 3 },
+                  { name: "Výběr dodavatele", order_index: 4 },
+                  { name: "Zahájení výstavby", order_index: 5 },
+                  { name: "Hrubá stavba", order_index: 6 },
+                  { name: "Klientské změny", order_index: 7 },
+                  { name: "Kolaudace", order_index: 8 },
+                  { name: "Předání jednotek", order_index: 9 },
+                  { name: "Exit / prodej projektu", order_index: 10 },
+                ];
+                await supabase.from("milestones").insert(typicke.map(m => ({ ...m, project_id: selectedProject.id, status: "inactive" })));
+                loadMilestones(selectedProject);
+              }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
+                📋 Typické milníky
+              </button>
+              </div>
             </div>
 
             {/* Ganttův diagram */}
