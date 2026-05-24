@@ -255,6 +255,12 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
   const [floor, setFloor] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [filterDisp, setFilterDisp] = useState("");
+  const [filterFloor, setFilterFloor] = useState("");
+  const [filterPrice, setFilterPrice] = useState("");
+  const [filterArea, setFilterArea] = useState("");
+  const [filterAreaMax, setFilterAreaMax] = useState("");
+  const [filterPriceMin, setFilterPriceMin] = useState("");
   const imgs = getImages(project.images);
 
   useEffect(() => {
@@ -268,7 +274,16 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
   }, [project.id]);
 
   const floors = [...new Set(units.map(u => u.floor))].sort();
-  const floorUnits = units.filter(u => u.floor === floor);
+  const floorUnits = units.filter(u => {
+    if (filterFloor && u.floor !== parseInt(filterFloor)) return false;
+    if (filterDisp && u.disp !== filterDisp) return false;
+    if (filterPrice && (u.price_net || u.price || 0) > parseInt(filterPrice)) return false;
+    if (filterPriceMin && (u.price_net || u.price || 0) < parseInt(filterPriceMin)) return false;
+    if (filterArea && u.area < parseInt(filterArea)) return false;
+    if (filterAreaMax && u.area > parseInt(filterAreaMax)) return false;
+    return true;
+  });
+  console.log("floorUnits:", floorUnits.length, "filterDisp:", filterDisp, "filterFloor:", filterFloor);
   const avail = project.total_units - project.sold_units;
 
   return (
@@ -313,15 +328,23 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
             <div style={{ fontSize: 14, fontWeight: 600, color: "#0D2137", marginBottom: 14 }}>Výběr bytu</div>
             {loading ? <div style={{ color: "#aaa" }}>Načítám...</div> : (
               <>
-                <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-                  {floors.map(f => (
-                    <button key={f} onClick={() => { setFloor(f); setSelectedUnit(null); }} style={{
-                      border: floor === f ? "none" : "1px solid #D0D8E8",
-                      borderRadius: 8, padding: "5px 14px", fontSize: 13, cursor: "pointer",
-                      background: floor === f ? "#1A3A6B" : "#fff",
-                      color: floor === f ? "#fff" : "#445566", fontWeight: floor === f ? 600 : 400,
-                    }}>{f}. patro</button>
-                  ))}
+                <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+                  <select value={filterDisp} onChange={e => { setFilterDisp(e.target.value); setSelectedUnit(null); }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D0D8E8", fontSize: 12, background: "#fff" }}>
+                    <option value="">Všechny dispozice</option>
+                    {[...new Set(units.map(u => u.disp).filter(Boolean))].map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <select value={filterFloor} onChange={e => { setFilterFloor(e.target.value); setSelectedUnit(null); }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D0D8E8", fontSize: 12, background: "#fff" }}>
+                    <option value="">Všechna patra</option>
+                    {floors.map(f => <option key={f} value={f}>{f}. patro</option>)}
+                  </select>
+                  <input type="number" placeholder="Cena od (Kč)" value={filterPriceMin} onChange={e => { setFilterPriceMin(e.target.value); setSelectedUnit(null); }}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D0D8E8", fontSize: 12, width: 130 }} />
+                  <input type="number" placeholder="Cena do (Kč)" value={filterPrice} onChange={e => { setFilterPrice(e.target.value); setSelectedUnit(null); }}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D0D8E8", fontSize: 12, width: 130 }} />
+                  <input type="number" placeholder="Plocha od (m²)" value={filterArea} onChange={e => { setFilterArea(e.target.value); setSelectedUnit(null); }}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D0D8E8", fontSize: 12, width: 120 }} />
+                  <input type="number" placeholder="Plocha do (m²)" value={filterAreaMax} onChange={e => { setFilterAreaMax(e.target.value); setSelectedUnit(null); }}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D0D8E8", fontSize: 12, width: 120 }} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8 }}>
                   {floorUnits.map(u => <UnitCell key={u.id} unit={u} selected={selectedUnit?.id === u.id} onClick={setSelectedUnit} />)}
