@@ -329,7 +329,6 @@ function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
     if (filterAreaMax && u.area > parseInt(filterAreaMax)) return false;
     return true;
   });
-  console.log("floorUnits:", floorUnits.length, "filterDisp:", filterDisp, "filterFloor:", filterFloor);
   const avail = project.total_units - project.sold_units;
 
   return (
@@ -598,7 +597,7 @@ function ReservationForm({ project, unit, onBack, onSuccess }) {
               <div style={{ borderTop: "1px solid #E8EDF5", margin: "10px 0" }} />
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17 }}>
                 <span style={{ color: "#8899AA" }}>Cena</span>
-                <span style={{ fontWeight: 800, color: "#1A3A6B" }}>{fmt(unit.price)}</span>
+                <span style={{ fontWeight: 800, color: "#1A3A6B" }}>{fmt(unit.price_net || unit.price)}</span>
               </div>
             </div>
             <div style={{ background: "#EEF3FA", borderRadius: 10, padding: 12, marginBottom: 12 }}>
