@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 function Section({ title, first, children }) {
   return (
     <div style={{ marginTop: first ? 0 : 20, paddingTop: first ? 0 : 20, borderTop: first ? "none" : "0.5px solid #eee" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "#888" }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "#888" }}>{title}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>{children}</div>
     </div>
   );
