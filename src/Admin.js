@@ -272,7 +272,7 @@ export default function Admin() {
     const pricePerM2 = unitForm.price_net && unitForm.area ? Math.round(unitForm.price_net / unitForm.area) : null;
     const data = { ...unitForm, price_per_sqm: pricePerM2 };
     if (unitForm.id) {
-      const { data: old } = await supabase.from("units").select("price_net, price_per_sqm").eq("id", unitForm.id).single();
+      const { data: old } = await supabase.from("units").select("price_net, price_per_sqm, status").eq("id", unitForm.id).single();
       await supabase.from("units").update(data).eq("id", unitForm.id);
       if (old && (old.price_net !== unitForm.price_net)) {
         await supabase.from("price_history").insert({
@@ -281,6 +281,20 @@ export default function Admin() {
           price_per_sqm: pricePerM2,
           changed_by: "Admin",
         });
+      }
+      // Automatická rezervace
+      if (old && old.status !== "reserved" && unitForm.status === "reserved") {
+        setUnitForm({});
+        loadUnits(selectedProject);
+        if (window.confirm("Byt byl nastaven jako rezervovaný. Chcete vytvořit rezervaci?")) {
+          setReservationForm({
+            unit_id: unitForm.id,
+            reserved_at: new Date().toISOString().split("T")[0],
+            status: "active",
+          });
+          setView("editReservation");
+        }
+        return;
       }
     } else {
       await supabase.from("units").insert({ ...data, project_id: selectedProject.id });
@@ -373,7 +387,8 @@ export default function Admin() {
     if (reservationForm.id) { await supabase.from("reservations").update(reservationForm).eq("id", reservationForm.id); }
     else { await supabase.from("reservations").insert(reservationForm); }
     setReservationForm({});
-    loadReservations();
+    await loadReservationsData();
+    setView("reservations");
   };
 
   const deleteReservation = async (id) => {
