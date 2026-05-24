@@ -12,6 +12,39 @@ function Section({ title, first, children }) {
   );
 }
 
+function PriceHistory({ unitId }) {
+  const [priceHistory, setPriceHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  return (
+    <div style={{ marginTop: 16, borderTop: "0.5px solid #eee", paddingTop: 16 }}>
+      <button onClick={async () => {
+        if (!showHistory) {
+          const { data } = await supabase.from("price_history").select("*").eq("unit_id", unitId).order("changed_at", { ascending: false });
+          setPriceHistory(data || []);
+        }
+        setShowHistory(s => !s);
+      }} style={{ background: "none", border: "none", color: "#1A3A6B", fontSize: 13, cursor: "pointer", padding: 0, fontWeight: 500 }}>
+        {showHistory ? "▼" : "▶"} Historie změn ceny
+      </button>
+      {showHistory && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          {priceHistory.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#aaa" }}>Žádné změny ceny.</div>
+          ) : priceHistory.map(h => (
+            <div key={h.id} style={{ background: "#f7f7f5", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "#1a1a1a", fontWeight: 600 }}>{h.price_net?.toLocaleString("cs-CZ")} Kč</span>
+              <span style={{ color: "#999" }}>{h.price_per_sqm?.toLocaleString("cs-CZ")} Kč/m²</span>
+              <span style={{ color: "#aaa" }}>{new Date(h.changed_at).toLocaleDateString("cs-CZ")}</span>
+              <span style={{ color: "#aaa" }}>{h.changed_by}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Admin() {
   const [authed, setAuthed] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
@@ -705,6 +738,12 @@ export default function Admin() {
               }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 📊 Export Excel
               </button>
+              <button onClick={async () => {
+                const { generateCenikPDF } = await import("./CenikPDF");
+                generateCenikPDF(selectedProject, selectedProject.units);
+              }} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                📄 Export PDF ceník
+              </button>
             </div>
             {(() => {
               const dispTypes = ["Vše", ...new Set(selectedProject.units?.map(u => u.disp).filter(Boolean))];
@@ -959,6 +998,8 @@ export default function Admin() {
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
               </div>
             </Section>
+
+            {unitForm.id && <PriceHistory unitId={unitForm.id} />}
 
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveUnit} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
@@ -1227,6 +1268,36 @@ export default function Admin() {
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>E-mail</label>
                 <input type="email" value={contactForm.email || ""} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))}
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Typ kontaktu</label>
+                <select value={contactForm.type || "zajemce"} onChange={e => setContactForm(f => ({ ...f, type: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="zajemce">Zájemce</option>
+                  <option value="kupujici">Kupující</option>
+                  <option value="investor">Investor</option>
+                  <option value="makler">Makléř</option>
+                  <option value="partner">Partner</option>
+                  <option value="dodavatel">Dodavatel</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Zdroj kontaktu</label>
+                <select value={contactForm.source || ""} onChange={e => setContactForm(f => ({ ...f, source: e.target.value }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- neznámý --</option>
+                  <option value="web">Web</option>
+                  <option value="sreality">Sreality</option>
+                  <option value="bezrealitky">Bezrealitky</option>
+                  <option value="doporuceni">Doporučení</option>
+                  <option value="telefon">Telefon</option>
+                  <option value="email">E-mail</option>
+                  <option value="kampan">Kampaň</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={contactForm.gdpr || false} onChange={e => setContactForm(f => ({ ...f, gdpr: e.target.checked }))} style={{ accentColor: "#1D9E75" }} />
+                <label style={{ fontSize: 13, color: "#1a1a1a" }}>GDPR souhlas udělen</label>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
