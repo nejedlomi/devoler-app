@@ -507,12 +507,23 @@ export default function Admin() {
             </Section>
 
             <Section title="Ceny">
-              <Input label="Cena bez DPH (Kč)" field="price_net" type="number" obj={unitForm} setObj={setUnitForm} />
-              <Input label="Cena s DPH (Kč)" field="price_vat" type="number" obj={unitForm} setObj={setUnitForm} />
+              <Input label="Cena za m² (Kč)" field="price_per_sqm" type="number" obj={unitForm} setObj={(updater) => {
+                setUnitForm(prev => {
+                  const next = typeof updater === "function" ? updater(prev) : updater;
+                  const priceNet = next.price_per_sqm && next.area ? Math.round(next.price_per_sqm * next.area) : next.price_net;
+                  return { ...next, price_net: priceNet };
+                });
+              }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Cena za m² (automaticky)</label>
-                <div style={{ padding: "8px 12px", borderRadius: 8, background: "#f0f0f0", fontSize: 13, color: "#666" }}>
-                  {unitForm.price_net && unitForm.area ? Math.round(unitForm.price_net / unitForm.area).toLocaleString("cs-CZ") + " Kč/m²" : "—"}
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Cena bez DPH (Kč)</label>
+                <div style={{ padding: "8px 12px", borderRadius: 8, background: "#f0f0f0", fontSize: 13, color: "#444" }}>
+                  {unitForm.price_net ? Math.round(unitForm.price_net).toLocaleString("cs-CZ") + " Kč" : "—"}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Cena s DPH 12% (Kč)</label>
+                <div style={{ padding: "8px 12px", borderRadius: 8, background: "#f0f0f0", fontSize: 13, color: "#444" }}>
+                  {unitForm.price_net ? Math.round(unitForm.price_net * 1.12).toLocaleString("cs-CZ") + " Kč" : "—"}
                 </div>
               </div>
             </Section>
