@@ -1595,6 +1595,34 @@ export default function Admin() {
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
               </div>
               <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Dokumenty</label>
+                <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" multiple onChange={async (e) => {
+                  const files = Array.from(e.target.files);
+                  const urls = [];
+                  for (const file of files) {
+                    const fileName = `reservations/${Date.now()}-${file.name}`;
+                    const { error } = await supabase.storage.from("documents").upload(fileName, file);
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName);
+                      urls.push({ name: file.name, url: urlData.publicUrl });
+                    }
+                  }
+                  const existing = Array.isArray(reservationForm.documents) ? reservationForm.documents : [];
+                  setReservationForm(f => ({ ...f, documents: [...existing, ...urls] }));
+                }} style={{ fontSize: 13 }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                  {(Array.isArray(reservationForm.documents) ? reservationForm.documents : []).map((doc, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f7f7f5", borderRadius: 8, padding: "8px 12px" }}>
+                      <a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#1A3A6B", textDecoration: "none" }}>
+                        📄 {doc.name}
+                      </a>
+                      <button onClick={() => setReservationForm(f => ({ ...f, documents: f.documents.filter((_, j) => j !== i) }))}
+                        style={{ background: "none", border: "none", color: "#E24B4A", cursor: "pointer", fontSize: 16 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
                 <textarea value={reservationForm.notes || ""} onChange={e => setReservationForm(f => ({ ...f, notes: e.target.value }))}
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
