@@ -44,7 +44,14 @@ export default function Admin() {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
-  useEffect(() => { loadProjects(); loadSettings(); setView("dashboard"); }, []);
+  useEffect(() => { 
+    loadProjects(); 
+    loadSettings(); 
+    loadContactsData();
+    loadLeadsData();
+    loadReservationsData();
+    setView("dashboard"); 
+  }, []);
 
   useEffect(() => {
     if (view !== "editProject") {
@@ -130,6 +137,21 @@ export default function Admin() {
     setSettings(s);
   };
 
+  const loadContactsData = async () => {
+    const { data } = await supabase.from("contacts").select("*, projects(name), units(unit_number, disp)").order("created_at", { ascending: false });
+    setContacts(data || []);
+  };
+
+  const loadLeadsData = async () => {
+    const { data } = await supabase.from("leads").select("*, contacts(name, phone, email), projects(name)").order("created_at", { ascending: false });
+    setLeads(data || []);
+  };
+
+  const loadReservationsData = async () => {
+    const { data } = await supabase.from("reservations").select("*, contacts(name, phone), units(unit_number, disp, area)").order("created_at", { ascending: false });
+    setReservations(data || []);
+  };
+
   const saveProject = async () => {
     const projectData = { ...form, images: form.images ? JSON.stringify(getImages(form.images)) : null };
     if (form.id) { await supabase.from("projects").update(projectData).eq("id", form.id); }
@@ -204,8 +226,7 @@ export default function Admin() {
 
   const loadContacts = async () => {
     setLoading(true);
-    const { data } = await supabase.from("contacts").select("*, projects(name), units(unit_number, disp)").order("created_at", { ascending: false });
-    setContacts(data || []);
+    await loadContactsData();
     setLoading(false);
     setView("contacts");
   };
@@ -228,8 +249,7 @@ export default function Admin() {
 
   const loadLeads = async () => {
     setLoading(true);
-    const { data } = await supabase.from("leads").select("*, contacts(name, phone, email), projects(name)").order("created_at", { ascending: false });
-    setLeads(data || []);
+    await loadLeadsData();
     setLoading(false);
     setView("leads");
   };
@@ -249,8 +269,7 @@ export default function Admin() {
 
   const loadReservations = async () => {
     setLoading(true);
-    const { data } = await supabase.from("reservations").select("*, contacts(name, phone), units(unit_number, disp, area), units(projects(name))").order("created_at", { ascending: false });
-    setReservations(data || []);
+    await loadReservationsData();
     setLoading(false);
     setView("reservations");
   };
