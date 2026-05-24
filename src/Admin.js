@@ -16,11 +16,13 @@ export default function Admin() {
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
   const [suggestions, setSuggestions] = useState([]);
+  const [settings, setSettings] = useState({});
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
-  useEffect(() => { loadProjects(); }, []);
+  useEffect(() => { loadProjects(); loadSettings(); }, []);
 
   useEffect(() => {
     if (view !== "editProject") {
@@ -113,6 +115,13 @@ export default function Admin() {
     setLoading(false);
   };
 
+  const loadSettings = async () => {
+    const { data } = await supabase.from("settings").select("*");
+    const s = {};
+    (data || []).forEach(r => { s[r.key] = r.value; });
+    setSettings(s);
+  };
+
   const saveProject = async () => {
     const images = getImages(form.images);
     const projectData = { ...form, images: images.length ? JSON.stringify(images) : null };
@@ -194,7 +203,10 @@ export default function Admin() {
     <div style={{ minHeight: "100vh", background: "#f7f7f5", fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ background: "#04342C", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>🏗 Admin panel</div>
-        <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
+          <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
+        </div>
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
@@ -391,6 +403,44 @@ export default function Admin() {
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={saveUnit} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
               <button onClick={() => { setView("units"); setUnitForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+
+        {!loading && view === "settings" && (
+          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>Nastavení webu</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                ["hero_label", "Malý text nahoře"],
+                ["hero_title", "Hlavní nadpis"],
+                ["hero_subtitle", "Podnadpis"],
+                ["company_name", "Název firmy"],
+                ["phone", "Telefon"],
+              ].map(([key, label]) => (
+                <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
+                  <input
+                    type="text"
+                    value={settings[key] || ""}
+                    onChange={e => setSettings(s => ({ ...s, [key]: e.target.value }))}
+                    style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={async () => {
+                setSettingsLoading(true);
+                for (const [key, value] of Object.entries(settings)) {
+                  await supabase.from("settings").upsert({ key, value });
+                }
+                setSettingsLoading(false);
+                alert("Nastavení uloženo!");
+              }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {settingsLoading ? "Ukládám..." : "Uložit nastavení"}
+              </button>
+              <button onClick={() => setView("projects")} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
             </div>
           </div>
         )}

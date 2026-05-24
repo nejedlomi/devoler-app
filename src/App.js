@@ -382,12 +382,25 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState(null);
   const [reservationUnit, setReservationUnit] = useState(null);
+  const [settings, setSettings] = useState({
+    hero_label: "Developerské projekty",
+    hero_title: "Vyberte svůj nový domov",
+    hero_subtitle: "novostavby i rekonstrukce",
+    company_name: "DeveloperX",
+    phone: "+420 777 000 000",
+  });
   const isAdmin = window.location.hash === "#admin";
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from("projects").select("*").order("created_at");
-      setProjects(data || []);
+      const [{ data: projectsData }, { data: settingsData }] = await Promise.all([
+        supabase.from("projects").select("*").order("created_at"),
+        supabase.from("settings").select("*"),
+      ]);
+      setProjects(projectsData || []);
+      const s = {};
+      (settingsData || []).forEach(r => { s[r.key] = r.value; });
+      setSettings(prev => ({ ...prev, ...s }));
       setLoading(false);
     };
     load();
@@ -400,22 +413,22 @@ export default function App() {
       <div style={{ background: "#0D2137", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => { setView("list"); setSelectedProject(null); }}>
           <div style={{ width: 32, height: 32, background: "#1A3A6B", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🏗</div>
-          <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>DeveloperX</span>
+          <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>{settings.company_name}</span>
         </div>
         <div style={{ display: "flex", gap: 24, fontSize: 14, color: "#7AA8D8", alignItems: "center" }}>
           <span style={{ cursor: "pointer" }}>O nás</span>
           <span style={{ cursor: "pointer" }}>Reference</span>
           <span style={{ cursor: "pointer" }}>Kontakt</span>
-          <button style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📞 Zavolat nám</button>
+          <button style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📞 {settings.phone}</button>
         </div>
       </div>
 
       {view === "list" && (
         <>
           <div style={{ background: "linear-gradient(135deg, #0D2137 0%, #1A3A6B 100%)", padding: "60px 28px 50px", textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "#7AA8D8", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12, fontWeight: 600 }}>Developerské projekty</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 12, lineHeight: 1.2 }}>Vyberte svůj nový domov</div>
-            <div style={{ fontSize: 15, color: "#7AA8D8" }}>{projects.length} projektů · novostavby i rekonstrukce</div>
+            <div style={{ fontSize: 12, color: "#7AA8D8", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12, fontWeight: 600 }}>{settings.hero_label}</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 12, lineHeight: 1.2 }}>{settings.hero_title}</div>
+            <div style={{ fontSize: 15, color: "#7AA8D8" }}>{projects.length} projektů · {settings.hero_subtitle}</div>
           </div>
           <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
             {loading ? (
