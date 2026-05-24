@@ -3,63 +3,77 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
 import * as XLSX from "xlsx";
 
+const C = {
+  bg: "#F0F4FA", sidebar: "#0D1F3C", sidebarActive: "#1D9E75",
+  card: "#ffffff", border: "#E2E8F4", text: "#0D2137", muted: "#7A8FAC",
+  accent: "#1D9E75", accentLight: "#E1F5EE", blue: "#1A3A6B", blueLight: "#EEF3FA",
+  red: "#E24B4A", redLight: "#FCEBEB", yellow: "#EF9F27", yellowLight: "#FAEEDA",
+};
+
+const inputStyle = { padding: "9px 13px", borderRadius: 9, border: `1px solid ${C.border}`, fontSize: 13, background: "#FAFBFD", color: C.text, outline: "none", width: "100%", boxSizing: "border-box" };
+const selectStyle = { ...inputStyle, cursor: "pointer" };
+
+function Badge({ color, bg, children }) {
+  return <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: bg, color, display: "inline-block" }}>{children}</span>;
+}
+
+function Card({ children, style }) {
+  return <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: "0 1px 6px rgba(10,30,60,0.06)", padding: "20px 22px", ...style }}>{children}</div>;
+}
+
+function Btn({ onClick, children, variant = "primary", size = "md", style }) {
+  const styles = { primary: { background: C.accent, color: "#fff", border: "none" }, secondary: { background: C.blueLight, color: C.blue, border: "none" }, danger: { background: C.redLight, color: C.red, border: "none" }, ghost: { background: "#f0f0f0", color: "#444", border: "none" }, dark: { background: C.blue, color: "#fff", border: "none" } };
+  const sizes = { sm: { padding: "5px 12px", fontSize: 12, borderRadius: 8 }, md: { padding: "8px 18px", fontSize: 13, borderRadius: 10 }, lg: { padding: "11px 26px", fontSize: 14, borderRadius: 10, fontWeight: 700 } };
+  return <button onClick={onClick} style={{ ...styles[variant], ...sizes[size], cursor: "pointer", fontWeight: 600, ...style }}>{children}</button>;
+}
+
+function FormField({ label, children, span }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, gridColumn: span ? "1 / -1" : "auto" }}>
+      <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function TextInput({ value, onChange, placeholder, type = "text" }) {
+  return <input type={type} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />;
+}
+
+function SelectInput({ value, onChange, options, placeholder }) {
+  return (
+    <select value={value || ""} onChange={e => onChange(e.target.value)} style={selectStyle}>
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+}
+
+function CheckboxField({ label, checked, onChange }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.text, cursor: "pointer" }}>
+      <input type="checkbox" checked={checked || false} onChange={e => onChange(e.target.checked)} style={{ accentColor: C.accent, width: 15, height: 15 }} />
+      {label}
+    </label>
+  );
+}
+
 function Section({ title, first, children }) {
   return (
-    <div style={{ marginTop: first ? 0 : 20, paddingTop: first ? 0 : 20, borderTop: first ? "none" : "0.5px solid #eee" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "#888" }}>{title}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>{children}</div>
+    <div style={{ marginTop: first ? 0 : 20, paddingTop: first ? 0 : 20, borderTop: first ? "none" : `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>{title}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>{children}</div>
     </div>
   );
 }
 
-function PriceHistory({ unitId }) {
-  const [priceHistory, setPriceHistory] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
-
-  return (
-    <div style={{ marginTop: 16, borderTop: "0.5px solid #eee", paddingTop: 16 }}>
-      <button onClick={async () => {
-        if (!showHistory) {
-          const { data } = await supabase.from("price_history").select("*").eq("unit_id", unitId).order("changed_at", { ascending: false });
-          setPriceHistory(data || []);
-        }
-        setShowHistory(s => !s);
-      }} style={{ background: "none", border: "none", color: "#1A3A6B", fontSize: 13, cursor: "pointer", padding: 0, fontWeight: 500 }}>
-        {showHistory ? "▼" : "▶"} Historie změn ceny
-      </button>
-      {showHistory && (
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-          {priceHistory.length === 0 ? (
-            <div style={{ fontSize: 12, color: "#aaa" }}>Žádné změny ceny.</div>
-          ) : priceHistory.map(h => (
-            <div key={h.id} style={{ background: "#f7f7f5", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "#1a1a1a", fontWeight: 600 }}>{h.price_net?.toLocaleString("cs-CZ")} Kč</span>
-              <span style={{ color: "#999" }}>{h.price_per_sqm?.toLocaleString("cs-CZ")} Kč/m²</span>
-              <span style={{ color: "#aaa" }}>{new Date(h.changed_at).toLocaleDateString("cs-CZ")}</span>
-              <span style={{ color: "#aaa" }}>{h.changed_by}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CommunicationLog({ contactId, supabase }) {
+function CommunicationLog({ contactId }) {
   const [logs, setLogs] = useState([]);
   const [newLog, setNewLog] = useState("");
   const [logType, setLogType] = useState("note");
-  const [loaded, setLoaded] = useState(false);
-
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.from("communication_log").select("*").eq("contact_id", contactId).order("created_at", { ascending: false });
-      setLogs(data || []);
-      setLoaded(true);
-    };
-    load();
+    supabase.from("communication_log").select("*").eq("contact_id", contactId).order("created_at", { ascending: false }).then(({ data }) => setLogs(data || []));
   }, [contactId]);
-
   const addLog = async () => {
     if (!newLog.trim()) return;
     await supabase.from("communication_log").insert({ contact_id: contactId, type: logType, content: newLog });
@@ -67,41 +81,77 @@ function CommunicationLog({ contactId, supabase }) {
     const { data } = await supabase.from("communication_log").select("*").eq("contact_id", contactId).order("created_at", { ascending: false });
     setLogs(data || []);
   };
-
   const typeIcon = { note: "📝", call: "📞", email: "✉️", meeting: "🤝", sms: "💬" };
   const typeLabel = { note: "Poznámka", call: "Hovor", email: "E-mail", meeting: "Schůzka", sms: "SMS" };
-
   return (
-    <div style={{ marginTop: 20, borderTop: "0.5px solid #eee", paddingTop: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 12 }}>Historie komunikace</div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <select value={logType} onChange={e => setLogType(e.target.value)}
-          style={{ padding: "8px 10px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa" }}>
-          {Object.entries(typeLabel).map(([val, lbl]) => <option key={val} value={val}>{typeIcon[val]} {lbl}</option>)}
+    <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 12 }}>Historie komunikace</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <select value={logType} onChange={e => setLogType(e.target.value)} style={{ ...selectStyle, width: "auto" }}>
+          {Object.entries(typeLabel).map(([v, l]) => <option key={v} value={v}>{typeIcon[v]} {l}</option>)}
         </select>
-        <input type="text" value={newLog} onChange={e => setNewLog(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addLog()}
-          placeholder="Přidat záznam... (Enter pro uložení)"
-          style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa" }} />
-        <button onClick={addLog} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-          Přidat
-        </button>
+        <input type="text" value={newLog} onChange={e => setNewLog(e.target.value)} onKeyDown={e => e.key === "Enter" && addLog()} placeholder="Přidat záznam... (Enter)" style={{ ...inputStyle, flex: 1 }} />
+        <Btn onClick={addLog} size="sm">Přidat</Btn>
       </div>
-
       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto" }}>
-        {logs.length === 0 && loaded && <div style={{ fontSize: 12, color: "#aaa", textAlign: "center", padding: 10 }}>Žádná komunikace.</div>}
+        {logs.length === 0 && <div style={{ fontSize: 12, color: C.muted, textAlign: "center" }}>Žádná komunikace.</div>}
         {logs.map(l => (
-          <div key={l.id} style={{ background: "#f7f7f5", borderRadius: 8, padding: "8px 12px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <div key={l.id} style={{ background: C.bg, borderRadius: 9, padding: "9px 12px", display: "flex", gap: 10 }}>
             <span style={{ fontSize: 16 }}>{typeIcon[l.type] || "📝"}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: "#1a1a1a" }}>{l.content}</div>
-              <div style={{ fontSize: 10, color: "#aaa", marginTop: 3 }}>
-                {new Date(l.created_at).toLocaleDateString("cs-CZ")} {new Date(l.created_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })} · {l.created_by}
-              </div>
-            </div>
+            <div><div style={{ fontSize: 13, color: C.text }}>{l.content}</div><div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>{new Date(l.created_at).toLocaleDateString("cs-CZ")} · {l.created_by}</div></div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const NAV = [
+  { id: "dashboard", icon: "📊", label: "Dashboard" },
+  { id: "projects", icon: "🏗", label: "Projekty" },
+  { id: "contacts", icon: "👥", label: "Kontakty" },
+  { id: "leads", icon: "🎯", label: "Pipeline" },
+  { id: "reservations", icon: "📋", label: "Rezervace" },
+  { id: "tasks", icon: "✅", label: "Úkoly" },
+  { id: "documents", icon: "📁", label: "Dokumenty" },
+  { id: "ai", icon: "🤖", label: "AI Asistent" },
+  { id: "settings", icon: "⚙️", label: "Nastavení" },
+];
+
+function Sidebar({ view, setView, currentUser, fns }) {
+  const isActive = (id) => view === id || (id === "projects" && ["units","editProject","editUnit","milestones","editMilestone"].includes(view));
+  return (
+    <div style={{ width: 220, minHeight: "100vh", background: C.sidebar, display: "flex", flexDirection: "column", position: "fixed", top: 0, left: 0, zIndex: 200 }}>
+      <div style={{ padding: "22px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 34, height: 34, background: C.accent, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🏗</div>
+          <div><div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>DeveloperX</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Admin panel</div></div>
+        </div>
+      </div>
+      <nav style={{ flex: 1, padding: "12px 10px" }}>
+        {NAV.map(item => (
+          <button key={item.id} onClick={() => {
+            if (item.id === "contacts") fns.loadContacts();
+            else if (item.id === "leads") fns.loadLeads();
+            else if (item.id === "reservations") fns.loadReservations();
+            else if (item.id === "tasks") fns.loadTasks();
+            else if (item.id === "documents") fns.loadDocuments();
+            else setView(item.id);
+          }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "none", marginBottom: 2, background: isActive(item.id) ? C.accent : "transparent", color: isActive(item.id) ? "#fff" : "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 13, fontWeight: isActive(item.id) ? 600 : 400, textAlign: "left" }}>
+            <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>{item.icon}</span>{item.label}
+          </button>
+        ))}
+        {currentUser?.role === "admin" && (
+          <button onClick={() => { fns.loadAdminUsers(); setView("users"); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "none", marginBottom: 2, background: view === "users" ? C.accent : "transparent", color: view === "users" ? "#fff" : "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 13, textAlign: "left" }}>
+            <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>👤</span>Uživatelé
+          </button>
+        )}
+      </nav>
+      <div style={{ padding: "14px 16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Přihlášen jako</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{currentUser?.full_name || currentUser?.username}</div>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{currentUser?.role === "admin" ? "Administrátor" : "Makléř"}</div>
+        <a href="/" style={{ display: "block", marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>← Zpět na web</a>
       </div>
     </div>
   );
@@ -112,78 +162,53 @@ export default function Admin() {
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
-  const [adminUsers, setAdminUsers] = useState([]);
-  const [userForm, setUserForm] = useState({});
   const [projects, setProjects] = useState([]);
-  const [view, setView] = useState("projects");
+  const [view, setView] = useState("dashboard");
   const [selectedProject, setSelectedProject] = useState(null);
+  const [loading] = useState(false);
+  const [form, setForm] = useState({});
+  const [unitForm, setUnitForm] = useState({});
+  const [milestoneForm, setMilestoneForm] = useState({});
+  const [contactForm, setContactForm] = useState({});
+  const [leadForm, setLeadForm] = useState({});
+  const [reservationForm, setReservationForm] = useState({});
+  const [documentForm, setDocumentForm] = useState({});
+  const [taskForm, setTaskForm] = useState({});
+  const [userForm, setUserForm] = useState({});
+  const [milestones, setMilestones] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [reservations, setReservations] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState([]);
   const [filterDisp, setFilterDisp] = useState("Vše");
   const [filterStatus, setFilterStatus] = useState("Vše");
-  const [filterBuilding, setFilterBuilding] = useState("Vše");
+  const [filterBuilding] = useState("Vše");
   const [filterPriceMax, setFilterPriceMax] = useState("");
-  const [milestones, setMilestones] = useState([]);
-  const [milestoneForm, setMilestoneForm] = useState({});
-  const [contacts, setContacts] = useState([]);
-  const [contactForm, setContactForm] = useState({});
   const [contactSearch, setContactSearch] = useState("");
-  const [leads, setLeads] = useState([]);
-  const [leadForm, setLeadForm] = useState({});
-  const [reservations, setReservations] = useState([]);
-  const [reservationForm, setReservationForm] = useState({});
-  const [dismissedAlerts, setDismissedAlerts] = useState([]);
-  const [documents, setDocuments] = useState([]);
-  const [documentForm, setDocumentForm] = useState({});
   const [documentSearch, setDocumentSearch] = useState("");
   const [documentFilter, setDocumentFilter] = useState("all");
-  const [tasks, setTasks] = useState([]);
-  const [taskForm, setTaskForm] = useState({});
   const [taskFilter, setTaskFilter] = useState("today");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [settings, setSettings] = useState({});
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSelectedProject, setAiSelectedProject] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({});
-  const [unitForm, setUnitForm] = useState({});
-  const [suggestions, setSuggestions] = useState([]);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfPreview, setPdfPreview] = useState(null);
   const [pdfEditor, setPdfEditor] = useState(null);
-  const [settings, setSettings] = useState({});
-  const [settingsLoading, setSettingsLoading] = useState(false);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
-  useEffect(() => { 
-    loadProjects(); 
-    loadSettings(); 
-    loadContactsData();
-    loadLeadsData();
-    loadReservationsData();
-    loadDismissedAlerts();
-    setView("dashboard"); 
-  }, []);
+  useEffect(() => { if (!authed) return; loadProjects(); loadSettings(); loadContactsData(); loadLeadsData(); loadReservationsData(); loadDismissedAlerts(); }, [authed]);
 
   useEffect(() => {
-    if (view !== "editProject") {
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-      markerRef.current = null;
-      return;
-    }
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    if (!window.L) {
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => setTimeout(initMap, 200);
-      document.head.appendChild(script);
-    } else {
-      setTimeout(initMap, 200);
-    }
+    if (view !== "editProject") { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } markerRef.current = null; return; }
+    if (!document.getElementById("leaflet-css")) { const link = document.createElement("link"); link.id = "leaflet-css"; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link); }
+    if (!window.L) { const script = document.createElement("script"); script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.onload = () => setTimeout(initMap, 200); document.head.appendChild(script); } else { setTimeout(initMap, 200); }
   }, [view]);
 
   const initMap = () => {
@@ -191,2576 +216,758 @@ export default function Admin() {
     if (!el || !window.L || mapRef.current) return;
     const L = window.L;
     const map = L.map("map-container").setView([form.lat || 50.0755, form.lng || 14.4378], form.lat ? 14 : 8);
-    L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=fDblwSe3VCWnYFEkUUBE`, {
-      attribution: "© MapTiler © OpenStreetMap", maxZoom: 20,
-    }).addTo(map);
+    L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=fDblwSe3VCWnYFEkUUBE`, { attribution: "© MapTiler", maxZoom: 20 }).addTo(map);
     if (form.lat) { markerRef.current = L.marker([form.lat, form.lng]).addTo(map); }
-    map.on("click", (e) => {
-      const { lat, lng } = e.latlng;
-      setForm(f => ({ ...f, lat, lng }));
-      if (markerRef.current) { markerRef.current.setLatLng([lat, lng]); }
-      else { markerRef.current = L.marker([lat, lng]).addTo(map); }
-    });
+    map.on("click", (e) => { const { lat, lng } = e.latlng; setForm(f => ({ ...f, lat, lng })); if (markerRef.current) { markerRef.current.setLatLng([lat, lng]); } else { markerRef.current = L.marker([lat, lng]).addTo(map); } });
     mapRef.current = map;
   };
 
-  const getImages = (images) => {
-    if (!images) return [];
-    if (Array.isArray(images)) return images;
-    try { return JSON.parse(images); } catch { return []; }
-  };
+  const getImages = (images) => { if (!images) return []; if (Array.isArray(images)) return images; try { return JSON.parse(images); } catch { return []; } };
 
   const searchAddress = async (val) => {
     setForm(f => ({ ...f, location: val }));
     if (val.length < 3) { setSuggestions([]); return; }
-    try {
-      const res = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(val)}.json?key=fDblwSe3VCWnYFEkUUBE&language=cs&country=cz,sk&limit=5`);
-      const data = await res.json();
-      const results = (data.features || []).map(f => ({ display_name: f.place_name, lat: f.center[1], lon: f.center[0] }));
-      setSuggestions(results);
-    } catch { setSuggestions([]); }
+    try { const res = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(val)}.json?key=fDblwSe3VCWnYFEkUUBE&language=cs&country=cz,sk&limit=5`); const data = await res.json(); setSuggestions((data.features || []).map(f => ({ display_name: f.place_name, lat: f.center[1], lon: f.center[0] }))); } catch { setSuggestions([]); }
   };
 
   const selectAddress = (s) => {
-    const lat = parseFloat(s.lat);
-    const lng = parseFloat(s.lon);
-    setForm(f => ({ ...f, location: s.display_name, lat, lng }));
-    setSuggestions([]);
-    if (mapRef.current) {
-      mapRef.current.setView([lat, lng], 15);
-      if (markerRef.current) { markerRef.current.setLatLng([lat, lng]); }
-      else { markerRef.current = window.L.marker([lat, lng]).addTo(mapRef.current); }
-    }
+    const lat = parseFloat(s.lat); const lng = parseFloat(s.lon);
+    setForm(f => ({ ...f, location: s.display_name, lat, lng })); setSuggestions([]);
+    if (mapRef.current) { mapRef.current.setView([lat, lng], 15); if (markerRef.current) { markerRef.current.setLatLng([lat, lng]); } else { markerRef.current = window.L.marker([lat, lng]).addTo(mapRef.current); } }
   };
 
-  const loadProjects = async () => {
-    setLoading(true);
-    const { data } = await supabase.from("projects").select("*").order("created_at");
-    setProjects(data || []);
-    setLoading(false);
-  };
+  const loadProjects = async () => { const { data } = await supabase.from("projects").select("*").order("created_at"); setProjects(data || []); };
+  const loadSettings = async () => { const { data } = await supabase.from("settings").select("*"); const s = {}; (data || []).forEach(r => { s[r.key] = r.value; }); setSettings(s); };
+  const loadContactsData = async () => { const { data } = await supabase.from("contacts").select("*, projects(name), units(unit_number, disp)").order("created_at", { ascending: false }); setContacts(data || []); };
+  const loadLeadsData = async () => { const { data } = await supabase.from("leads").select("*, contacts(name, phone, email), projects(name)").order("created_at", { ascending: false }); setLeads(data || []); };
+  const loadReservationsData = async () => { const { data } = await supabase.from("reservations").select("*, contacts(name, phone), units(unit_number, disp, area)").order("created_at", { ascending: false }); setReservations(data || []); };
+  const loadDismissedAlerts = async () => { const { data } = await supabase.from("dismissed_alerts").select("alert_key"); setDismissedAlerts((data || []).map(d => d.alert_key)); };
+  const dismissAlert = async (key) => { await supabase.from("dismissed_alerts").upsert({ alert_key: key }); setDismissedAlerts(prev => [...prev, key]); };
+  const loadContacts = async () => { await loadContactsData(); setView("contacts"); };
+  const loadLeads = async () => { await loadLeadsData(); setView("leads"); };
+  const loadReservations = async () => { await loadReservationsData(); setView("reservations"); };
+  const loadUnits = async (project) => { const { data } = await supabase.from("units").select("*").eq("project_id", project.id).order("floor"); setSelectedProject({ ...project, units: data || [] }); setView("units"); };
+  const loadMilestones = async (project) => { const { data } = await supabase.from("milestones").select("*").eq("project_id", project.id).order("order_index"); setMilestones(data || []); setSelectedProject(project); setView("milestones"); };
+  const loadDocuments = async () => { const { data } = await supabase.from("documents").select("*, projects(name), units(unit_number, disp), contacts(name)").order("created_at", { ascending: false }); setDocuments(data || []); setView("documents"); };
+  const loadTasks = async () => { const { data } = await supabase.from("tasks").select("*, projects(name), units(unit_number, disp), contacts(name)").order("due_date", { ascending: true }); setTasks(data || []); setView("tasks"); };
+  const loadAdminUsers = async () => { const { data } = await supabase.from("admin_users").select("id, username, full_name, email, role"); setAdminUsers(data || []); };
 
-  const loadSettings = async () => {
-    const { data } = await supabase.from("settings").select("*");
-    const s = {};
-    (data || []).forEach(r => { s[r.key] = r.value; });
-    setSettings(s);
-  };
-
-  const loadContactsData = async () => {
-    const { data } = await supabase.from("contacts").select("*, projects(name), units(unit_number, disp)").order("created_at", { ascending: false });
-    setContacts(data || []);
-  };
-
-  const loadLeadsData = async () => {
-    const { data } = await supabase.from("leads").select("*, contacts(name, phone, email), projects(name)").order("created_at", { ascending: false });
-    setLeads(data || []);
-  };
-
-  const loadReservationsData = async () => {
-    const { data } = await supabase.from("reservations").select("*, contacts(name, phone), units(unit_number, disp, area)").order("created_at", { ascending: false });
-    setReservations(data || []);
-  };
-
-  const loadDismissedAlerts = async () => {
-    const { data } = await supabase.from("dismissed_alerts").select("alert_key");
-    setDismissedAlerts((data || []).map(d => d.alert_key));
-  };
-
-  const loadAdminUsers = async () => {
-    const { data } = await supabase.from("admin_users").select("id, username, full_name, email, role");
-    setAdminUsers(data || []);
-  };
-
-  const saveAdminUser = async () => {
-    const { id, ...data } = userForm;
-    if (id && !data.password) delete data.password;
-    if (id) { await supabase.from("admin_users").update(data).eq("id", id); }
-    else { await supabase.from("admin_users").insert(data); }
-    setUserForm({});
-    loadAdminUsers();
-  };
-
-  const deleteAdminUser = async (id) => {
-    if (id === currentUser?.id) { alert("Nemůžete smazat vlastní účet!"); return; }
-    if (!window.confirm("Smazat uživatele?")) return;
-    await supabase.from("admin_users").delete().eq("id", id);
-    loadAdminUsers();
-  };
-
-  const loadTasks = async () => {
-    setLoading(true);
-    const { data } = await supabase.from("tasks")
-      .select("*, projects(name), units(unit_number, disp), contacts(name)")
-      .order("due_date", { ascending: true });
-    setTasks(data || []);
-    setLoading(false);
-    setView("tasks");
-  };
-
-  const saveTask = async () => {
-    const { id, projects, units, contacts, ...data } = taskForm;
-    if (id) { await supabase.from("tasks").update(data).eq("id", id); }
-    else { await supabase.from("tasks").insert(data); }
-    setTaskForm({});
-    loadTasks();
-  };
-
-  const deleteTask = async (id) => {
-    if (!window.confirm("Smazat úkol?")) return;
-    await supabase.from("tasks").delete().eq("id", id);
-    loadTasks();
-  };
-
-  const completeTask = async (id, currentStatus) => {
-    if (currentStatus === "done") {
-      await supabase.from("tasks").update({ status: "todo", completed_at: null }).eq("id", id);
-    } else {
-      await supabase.from("tasks").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", id);
-    }
-    loadTasks();
-  };
-
-  const callAI = async (prompt) => {
-    setAiLoading(true);
-    setAiResult("");
-    try {
-      const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/extract-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE`,
-        },
-        body: JSON.stringify({ prompt }),
-      });
-      const data = await res.json();
-      setAiResult(data.text || data.error || "Chyba");
-    } catch (err) {
-      setAiResult("Chyba: " + err.message);
-    }
-    setAiLoading(false);
-  };
-
-  const dismissAlert = async (key) => {
-    await supabase.from("dismissed_alerts").upsert({ alert_key: key });
-    setDismissedAlerts(prev => [...prev, key]);
-  };
-
-  const loadDocuments = async () => {
-    setLoading(true);
-    const { data } = await supabase.from("documents")
-      .select("*, projects(name), units(unit_number, disp), contacts(name)")
-      .order("created_at", { ascending: false });
-    setDocuments(data || []);
-    setLoading(false);
-    setView("documents");
-  };
-
-  const saveDocument = async () => {
-    const { id, projects, units, contacts, ...data } = documentForm;
-    if (id) { await supabase.from("documents").update(data).eq("id", id); }
-    else { await supabase.from("documents").insert(data); }
-    setDocumentForm({});
-    loadDocuments();
-  };
-
-  const deleteDocument = async (id, url) => {
-    if (!window.confirm("Smazat dokument?")) return;
-    await supabase.from("documents").delete().eq("id", id);
-    loadDocuments();
-  };
-
-  const saveProject = async () => {
-    const projectData = { ...form, images: form.images ? JSON.stringify(getImages(form.images)) : null };
-    if (form.id) { await supabase.from("projects").update(projectData).eq("id", form.id); }
-    else { await supabase.from("projects").insert(projectData); }
-    setView("projects");
-    setForm({});
-    loadProjects();
-  };
-
-  const deleteProject = async (id) => {
-    if (!window.confirm("Opravdu smazat projekt?")) return;
-    await supabase.from("projects").delete().eq("id", id);
-    loadProjects();
-  };
-
-  const loadUnits = async (project) => {
-    const { data } = await supabase.from("units").select("*").eq("project_id", project.id).order("floor");
-    setSelectedProject({ ...project, units: data || [] });
-    setView("units");
-  };
+  const saveProject = async () => { const d = { ...form, images: form.images ? JSON.stringify(getImages(form.images)) : null }; if (form.id) { await supabase.from("projects").update(d).eq("id", form.id); } else { await supabase.from("projects").insert(d); } setView("projects"); setForm({}); loadProjects(); };
+  const deleteProject = async (id) => { if (!window.confirm("Smazat projekt?")) return; await supabase.from("projects").delete().eq("id", id); loadProjects(); };
 
   const saveUnit = async () => {
     const pricePerM2 = unitForm.price_net && unitForm.area ? Math.round(unitForm.price_net / unitForm.area) : null;
     const data = { ...unitForm, price_per_sqm: pricePerM2 };
     if (unitForm.id) {
-      const { data: old } = await supabase.from("units").select("price_net, price_per_sqm, status").eq("id", unitForm.id).single();
+      const { data: old } = await supabase.from("units").select("price_net, status").eq("id", unitForm.id).single();
       await supabase.from("units").update(data).eq("id", unitForm.id);
-      if (old && (old.price_net !== unitForm.price_net)) {
-        await supabase.from("price_history").insert({
-          unit_id: unitForm.id,
-          price_net: unitForm.price_net,
-          price_per_sqm: pricePerM2,
-          changed_by: "Admin",
-        });
-      }
-      // Automatická rezervace
+      if (old && old.price_net !== unitForm.price_net) { await supabase.from("price_history").insert({ unit_id: unitForm.id, price_net: unitForm.price_net, price_per_sqm: pricePerM2, changed_by: "Admin" }); }
       if (old && old.status !== "reserved" && unitForm.status === "reserved") {
-        setUnitForm({});
-        loadUnits(selectedProject);
-        if (window.confirm("Byt byl nastaven jako rezervovaný. Chcete vytvořit rezervaci?")) {
-          setReservationForm({
-            unit_id: unitForm.id,
-            reserved_at: new Date().toISOString().split("T")[0],
-            status: "active",
-          });
-          setView("editReservation");
-        }
+        setUnitForm({}); loadUnits(selectedProject);
+        if (window.confirm("Byt nastaven jako rezervovaný. Vytvořit rezervaci?")) { setReservationForm({ unit_id: unitForm.id, reserved_at: new Date().toISOString().split("T")[0], status: "active" }); setView("editReservation"); }
         return;
       }
-    } else {
-      await supabase.from("units").insert({ ...data, project_id: selectedProject.id });
-    }
-    setUnitForm({});
-    loadUnits(selectedProject);
+    } else { await supabase.from("units").insert({ ...data, project_id: selectedProject.id }); }
+    setUnitForm({}); loadUnits(selectedProject);
   };
 
-  const deleteUnit = async (id) => {
-    if (!window.confirm("Opravdu smazat byt?")) return;
-    await supabase.from("units").delete().eq("id", id);
-    loadUnits(selectedProject);
-  };
-
-  const loadMilestones = async (project) => {
-    const { data } = await supabase.from("milestones").select("*").eq("project_id", project.id).order("order_index");
-    setMilestones(data || []);
-    setSelectedProject(project);
-    setView("milestones");
-  };
-
-  const saveMilestone = async () => {
-    if (milestoneForm.id) {
-      await supabase.from("milestones").update(milestoneForm).eq("id", milestoneForm.id);
-    } else {
-      const maxOrder = milestones.length > 0 ? Math.max(...milestones.map(m => m.order_index)) + 1 : 0;
-      await supabase.from("milestones").insert({ ...milestoneForm, project_id: selectedProject.id, order_index: maxOrder });
-    }
-    setMilestoneForm({});
-    loadMilestones(selectedProject);
-  };
-
-  const deleteMilestone = async (id) => {
-    if (!window.confirm("Smazat milník?")) return;
-    await supabase.from("milestones").delete().eq("id", id);
-    loadMilestones(selectedProject);
-  };
-
-  const loadContacts = async () => {
-    setLoading(true);
-    await loadContactsData();
-    setLoading(false);
-    setView("contacts");
-  };
-
-  const saveContact = async () => {
-    if (contactForm.id) {
-      await supabase.from("contacts").update(contactForm).eq("id", contactForm.id);
-    } else {
-      await supabase.from("contacts").insert(contactForm);
-    }
-    setContactForm({});
-    loadContacts();
-  };
-
-  const deleteContact = async (id) => {
-    if (!window.confirm("Smazat kontakt?")) return;
-    await supabase.from("contacts").delete().eq("id", id);
-    loadContacts();
-  };
-
-  const loadLeads = async () => {
-    setLoading(true);
-    await loadLeadsData();
-    setLoading(false);
-    setView("leads");
-  };
-
-  const saveLead = async () => {
-    if (leadForm.id) { await supabase.from("leads").update(leadForm).eq("id", leadForm.id); }
-    else { await supabase.from("leads").insert(leadForm); }
-    setLeadForm({});
-    loadLeads();
-  };
-
-  const deleteLead = async (id) => {
-    if (!window.confirm("Smazat lead?")) return;
-    await supabase.from("leads").delete().eq("id", id);
-    loadLeads();
-  };
-
-  const loadReservations = async () => {
-    setLoading(true);
-    await loadReservationsData();
-    setLoading(false);
-    setView("reservations");
-  };
+  const deleteUnit = async (id) => { if (!window.confirm("Smazat byt?")) return; await supabase.from("units").delete().eq("id", id); loadUnits(selectedProject); };
+  const saveMilestone = async () => { if (milestoneForm.id) { await supabase.from("milestones").update(milestoneForm).eq("id", milestoneForm.id); } else { const maxOrder = milestones.length > 0 ? Math.max(...milestones.map(m => m.order_index)) + 1 : 0; await supabase.from("milestones").insert({ ...milestoneForm, project_id: selectedProject.id, order_index: maxOrder }); } setMilestoneForm({}); loadMilestones(selectedProject); };
+  const deleteMilestone = async (id) => { if (!window.confirm("Smazat milník?")) return; await supabase.from("milestones").delete().eq("id", id); loadMilestones(selectedProject); };
+  const saveContact = async () => { if (contactForm.id) { await supabase.from("contacts").update(contactForm).eq("id", contactForm.id); } else { await supabase.from("contacts").insert(contactForm); } setContactForm({}); loadContacts(); };
+  const deleteContact = async (id) => { if (!window.confirm("Smazat kontakt?")) return; await supabase.from("contacts").delete().eq("id", id); loadContacts(); };
+  const saveLead = async () => { if (leadForm.id) { await supabase.from("leads").update(leadForm).eq("id", leadForm.id); } else { await supabase.from("leads").insert(leadForm); } setLeadForm({}); loadLeads(); };
+  const deleteLead = async (id) => { if (!window.confirm("Smazat lead?")) return; await supabase.from("leads").delete().eq("id", id); loadLeads(); };
 
   const saveReservation = async () => {
     const { _project_id, _project_units, ...cleanForm } = reservationForm;
-    if (cleanForm.id) {
-      await supabase.from("reservations").update(cleanForm).eq("id", cleanForm.id);
-    } else {
-      await supabase.from("reservations").insert(cleanForm);
-      if (cleanForm.unit_id) {
-        await supabase.from("units").update({ status: "reserved" }).eq("id", cleanForm.unit_id);
-      }
-    }
-    setReservationForm({});
-    await Promise.all([loadReservationsData(), loadLeadsData(), loadContactsData(), loadProjects()]);
-    if (selectedProject) {
-      await loadUnits(selectedProject);
-    } else {
-      setView("reservations");
-    }
+    if (cleanForm.id) { await supabase.from("reservations").update(cleanForm).eq("id", cleanForm.id); } else { await supabase.from("reservations").insert(cleanForm); if (cleanForm.unit_id) { await supabase.from("units").update({ status: "reserved" }).eq("id", cleanForm.unit_id); } }
+    setReservationForm({}); await Promise.all([loadReservationsData(), loadLeadsData(), loadContactsData(), loadProjects()]);
+    if (selectedProject) { await loadUnits(selectedProject); } else { setView("reservations"); }
   };
 
-  const deleteReservation = async (id) => {
-    if (!window.confirm("Smazat rezervaci?")) return;
-    await supabase.from("reservations").delete().eq("id", id);
-    loadReservations();
+  const deleteReservation = async (id) => { if (!window.confirm("Smazat rezervaci?")) return; await supabase.from("reservations").delete().eq("id", id); loadReservations(); };
+  const saveDocument = async () => { const { id, projects: _p, units: _u, contacts: _c, ...data } = documentForm; if (id) { await supabase.from("documents").update(data).eq("id", id); } else { await supabase.from("documents").insert(data); } setDocumentForm({}); loadDocuments(); };
+  const deleteDocument = async (id) => { if (!window.confirm("Smazat dokument?")) return; await supabase.from("documents").delete().eq("id", id); loadDocuments(); };
+  const saveTask = async () => { const { id, projects: _p, units: _u, contacts: _c, ...data } = taskForm; if (id) { await supabase.from("tasks").update(data).eq("id", id); } else { await supabase.from("tasks").insert(data); } setTaskForm({}); loadTasks(); };
+  const deleteTask = async (id) => { if (!window.confirm("Smazat úkol?")) return; await supabase.from("tasks").delete().eq("id", id); loadTasks(); };
+  const completeTask = async (id, currentStatus) => { if (currentStatus === "done") { await supabase.from("tasks").update({ status: "todo", completed_at: null }).eq("id", id); } else { await supabase.from("tasks").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", id); } loadTasks(); };
+  const saveAdminUser = async () => { const { id, ...data } = userForm; if (!data.password) delete data.password; if (id) { await supabase.from("admin_users").update(data).eq("id", id); } else { await supabase.from("admin_users").insert(data); } setUserForm({}); loadAdminUsers(); };
+  const deleteAdminUser = async (id) => { if (id === currentUser?.id) { alert("Nemůžete smazat vlastní účet!"); return; } if (!window.confirm("Smazat uživatele?")) return; await supabase.from("admin_users").delete().eq("id", id); loadAdminUsers(); };
+
+  const callAI = async (prompt) => {
+    setAiLoading(true); setAiResult("");
+    try {
+      const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/extract-pdf", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE` }, body: JSON.stringify({ prompt }) });
+      const data = await res.json(); setAiResult(data.text || data.error || "Chyba");
+    } catch (err) { setAiResult("Chyba: " + err.message); }
+    setAiLoading(false);
   };
 
-  const Input = ({ label, field, type, obj, setObj, span }) => {
-    const [localVal, setLocalVal] = useState(obj[field] || "");
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: span ? "1 / -1" : "auto" }}>
-        <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
-        <input type={type || "text"} value={localVal}
-          onChange={e => setLocalVal(e.target.value)}
-          onBlur={() => setObj(o => ({ ...o, [field]: type === "number" ? parseInt(localVal) || 0 : localVal }))}
-          style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}
-        />
-      </div>
-    );
-  };
+  const statusColor = (s) => { if (s === "available") return { bg: "#E1F5EE", color: "#0F6E56" }; if (s === "reserved") return { bg: C.yellowLight, color: "#633806" }; if (s === "sold") return { bg: "#f0f0f0", color: "#666" }; if (s === "blocked") return { bg: C.redLight, color: C.red }; return { bg: "#f0f0f0", color: "#666" }; };
+  const statusLabel = (s) => ({ available: "Volná", reserved: "Rezervovaná", sold: "Prodaná", blocked: "Blokovaná", withdrawn: "Stažená" }[s] || s);
 
-  const Select = ({ label, field, options, obj, setObj, span }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: span ? "1 / -1" : "auto" }}>
-      <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
-      <select value={obj[field] || ""} onChange={e => setObj(o => ({ ...o, [field]: e.target.value }))}
-        style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-        <option value="">-- vyberte --</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  );
-
-  const Checkbox = ({ label, field, obj, setObj }) => (
-    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1a1a1a", cursor: "pointer" }}>
-      <input type="checkbox" checked={obj[field] || false}
-        onChange={e => setObj(o => ({ ...o, [field]: e.target.checked }))}
-        style={{ accentColor: "#1D9E75" }} />
-      {label}
-    </label>
-  );
-
-  const statusColor = (s) => {
-    if (s === "available") return { bg: "#E1F5EE", color: "#0F6E56" };
-    if (s === "reserved") return { bg: "#FAEEDA", color: "#633806" };
-    if (s === "sold") return { bg: "#f0f0f0", color: "#666" };
-    if (s === "blocked") return { bg: "#FCEBEB", color: "#A32D2D" };
-    return { bg: "#f0f0f0", color: "#666" };
-  };
-
-  const statusLabel = (s) => ({
-    available: "Volná", reserved: "Rezervovaná", sold: "Prodaná", blocked: "Blokovaná", withdrawn: "Stažená"
-  }[s] || s);
-
-  const login = async () => {
-    const { data, error } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password);
-    console.log("Login result:", data, error);
-    if (data && data.length > 0) { setAuthed(true); setCurrentUser(data[0]); setLoginError(""); }
-    else { setLoginError("Špatné jméno nebo heslo"); }
-  };
+  const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE";
 
   if (!authed) return (
-    <div style={{ minHeight: "100vh", background: "#04342C", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 36, width: 340, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>🏗 Admin panel</div>
-        <div style={{ fontSize: 13, color: "#999", marginBottom: 24 }}>Přihlaste se pro přístup</div>
+    <div style={{ minHeight: "100vh", background: `linear-gradient(135deg, ${C.sidebar} 0%, #1A3A6B 100%)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: 40, width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ width: 52, height: 52, background: C.accent, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 14px" }}>🏗</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>Admin panel</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Přihlaste se pro přístup</div>
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Uživatelské jméno</label>
-            <input type="text" value={loginForm.username} onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))}
-              style={{ width: "100%", marginTop: 4, padding: "10px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Heslo</label>
-            <input type="password" value={loginForm.password} onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
-              onKeyDown={async e => { if (e.key === "Enter") await login(); }}
-              style={{ width: "100%", marginTop: 4, padding: "10px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, boxSizing: "border-box" }} />
-          </div>
-          {loginError && <div style={{ fontSize: 12, color: "#E24B4A" }}>{loginError}</div>}
-          <button onClick={login} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>
-            Přihlásit se
-          </button>
+          <div><label style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Uživatelské jméno</label><input type="text" value={loginForm.username} onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))} style={{ ...inputStyle, marginTop: 5 }} placeholder="admin" /></div>
+          <div><label style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Heslo</label><input type="password" value={loginForm.password} onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))} onKeyDown={async e => { if (e.key === "Enter") { const { data } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password); console.log("Login result:", data, null); if (data && data.length > 0) { setAuthed(true); setCurrentUser(data[0]); setLoginError(""); } else { setLoginError("Špatné jméno nebo heslo"); } } }} style={{ ...inputStyle, marginTop: 5 }} placeholder="••••••••" /></div>
+          {loginError && <div style={{ fontSize: 12, color: C.red, background: C.redLight, padding: "8px 12px", borderRadius: 8 }}>{loginError}</div>}
+          <button onClick={async () => { const { data } = await supabase.from("admin_users").select("*").eq("username", loginForm.username).eq("password", loginForm.password); console.log("Login result:", data, null); if (data && data.length > 0) { setAuthed(true); setCurrentUser(data[0]); setLoginError(""); } else { setLoginError("Špatné jméno nebo heslo"); } }} style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>Přihlásit se</button>
         </div>
       </div>
     </div>
   );
 
+  const fns = { loadContacts, loadLeads, loadReservations, loadTasks, loadDocuments, loadAdminUsers };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f7f5", fontFamily: "'DM Sans', sans-serif" }}>
-      <div style={{ background: "#04342C", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>🏗 Admin panel</div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button onClick={async () => {
-            await loadReservationsData();
-            await loadLeadsData();
-            await loadContactsData();
-            await loadProjects();
-            setView("dashboard");
-          }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📊 Dashboard</button>
-          <button onClick={() => { loadContacts(); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👥 Kontakty</button>
-          <button onClick={() => loadLeads()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🎯 Pipeline</button>
-          <button onClick={() => loadReservations()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📋 Rezervace</button>
-          <button onClick={() => loadDocuments()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>📁 Dokumenty</button>
-          <button onClick={() => loadTasks()} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>✅ Úkoly</button>
-          <button onClick={() => setView("ai")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>🤖 AI asistent</button>
-          <button onClick={() => setView("settings")} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>⚙️ Nastavení</button>
-          {currentUser?.role === "admin" && (
-            <button onClick={() => { loadAdminUsers(); setView("users"); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, color: "#9FE1CB", cursor: "pointer" }}>👤 Uživatelé</button>
-          )}
-          <a href="/" style={{ fontSize: 13, color: "#9FE1CB", textDecoration: "none" }}>← Zpět na web</a>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}>
-
-        {loading && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Načítám...</div>}
+    <div style={{ display: "flex", minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
+      <Sidebar view={view} setView={setView} currentUser={currentUser} fns={fns} />
+      <div style={{ marginLeft: 220, flex: 1, padding: "28px 32px" }}>
 
         {/* DASHBOARD */}
-        {!loading && view === "dashboard" && (
+        {view === "dashboard" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Dashboard</div>
-              <button onClick={async () => {
-                const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/send-expiry-alert", {
-                  headers: { "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE` }
-                });
-                const data = await res.json();
-                if (data.count === 0) {
-                  alert("Žádné expirující rezervace v příštích 3 dnech.");
-                } else {
-                  alert(`⚠️ ${data.count} expirujících rezervací:\n${data.alerts.map(a => `• ${a.contact} — expiruje ${a.valid_until}`).join("\n")}`);
-                }
-              }} style={{ background: "#FAEEDA", color: "#633806", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
-                🔔 Zkontrolovat expirující rezervace
-              </button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div><h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: C.text }}>Dashboard</h2><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Přehled všech projektů</div></div>
+              <button onClick={async () => { const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/send-expiry-alert", { headers: { "Authorization": `Bearer ${ANON_KEY}` } }); const data = await res.json(); alert(data.count === 0 ? "Žádné expirující rezervace." : `⚠️ ${data.count} expirujících:\n${data.alerts.map(a => `• ${a.contact} — ${a.valid_until}`).join("\n")}`); }} style={{ background: C.yellowLight, color: "#633806", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>🔔 Expirující rezervace</button>
             </div>
-
             {(() => {
-              const today = new Date();
-              const warnings = [];
-              if (warnings.length === 0) {
-                const delayedProjects = projects.filter(p => p.completion && new Date(p.completion.replace("Q1", "03-31").replace("Q2", "06-30").replace("Q3", "09-30").replace("Q4", "12-31")) < today);
-                delayedProjects.forEach(p => warnings.push({ type: "delayed", key: `delayed-${p.id}`, text: `Projekt ${p.name} má termín dokončení v minulosti` }));
-              }
-              reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).forEach(r => {
-                warnings.push({ type: "reservation", key: `reservation-${r.id}`, text: `Rezervace ${r.contacts?.name || "—"} expiruje ${r.valid_until}` });
-              });
-              leads.filter(l => l.next_contact_date && new Date(l.next_contact_date) < new Date()).forEach(l => {
-                warnings.push({ type: "lead", key: `lead-${l.id}`, text: `Lead ${l.contacts?.name || "—"} — prošel termín kontaktu (${l.next_contact_date})` });
-              });
-              const visibleWarnings = warnings.filter(w => !dismissedAlerts.includes(w.key));
-              return visibleWarnings.length > 0 ? (
-                <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#A32D2D", marginBottom: 8 }}>⚠️ Upozornění</div>
-                  {visibleWarnings.map((w, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: "#A32D2D", marginBottom: 4 }}>
+              const today = new Date(); const warnings = [];
+              reservations.filter(r => r.valid_until && new Date(r.valid_until) - today < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > today).forEach(r => warnings.push({ key: `reservation-${r.id}`, text: `Rezervace ${r.contacts?.name || "—"} expiruje ${r.valid_until}` }));
+              leads.filter(l => l.next_contact_date && new Date(l.next_contact_date) < today).forEach(l => warnings.push({ key: `lead-${l.id}`, text: `Lead ${l.contacts?.name || "—"} — prošel termín kontaktu (${l.next_contact_date})` }));
+              const visible = warnings.filter(w => !dismissedAlerts.includes(w.key));
+              return visible.length > 0 ? (
+                <div style={{ background: C.redLight, border: `1px solid #F5BDBC`, borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.red, marginBottom: 8 }}>⚠️ Upozornění</div>
+                  {visible.map(w => (
+                    <div key={w.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: C.red, marginBottom: 4 }}>
                       <span>• {w.text}</span>
-                      <button onClick={() => dismissAlert(w.key)} style={{ background: "none", border: "0.5px solid #A32D2D", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#A32D2D", cursor: "pointer", marginLeft: 10 }}>
-                        ✓ Vzato na vědomí
-                      </button>
+                      <button onClick={() => dismissAlert(w.key)} style={{ background: "none", border: `1px solid ${C.red}`, borderRadius: 6, padding: "2px 8px", fontSize: 11, color: C.red, cursor: "pointer" }}>✓ Vzato na vědomí</button>
                     </div>
                   ))}
                 </div>
               ) : null;
             })()}
-
-            {/* Statistiky */}
             {(() => {
               const totalUnits = projects.reduce((s, p) => s + (p.total_units || 0), 0);
               const soldUnits = projects.reduce((s, p) => s + (p.sold_units || 0), 0);
-              const availUnits = totalUnits - soldUnits;
-
+              const stats = [["📊","Projekty",projects.length,C.blue,() => setView("projects")],["🏠","Celkem bytů",totalUnits,C.accent,null],["✅","Prodáno",soldUnits,"#0F6E56",null],["🔓","Volných",totalUnits-soldUnits,"#633806",null],["🎯","Leads",leads.length,"#7A4A0A",loadLeads],["📋","Rezervace",reservations.length,"#4A3A9A",loadReservations],["⚠️","Expirující",reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3*24*60*60*1000 && new Date(r.valid_until) > new Date()).length,C.red,loadReservations],["👥","Kontakty",contacts.length,C.accent,loadContacts]];
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-                  {[
-                    ["🏗", "Projekty", projects.length, "#1A3A6B", "projects"],
-                    ["🏠", "Celkem bytů", totalUnits, "#1D9E75", null],
-                    ["✅", "Prodáno", soldUnits, "#0F6E56", null],
-                    ["🔓", "Volných", availUnits, "#633806", null],
-                    ["🎯", "Leads", leads.length, "#7A4A0A", "leads"],
-                    ["📋", "Rezervace", reservations.length, "#4A3A9A", "reservations"],
-                    ["⚠️", "Expirující", reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).length, "#A32D2D", "reservations"],
-                    ["👥", "Kontakty", contacts.length, "#0F6E56", "contacts"],
-                  ].map(([icon, label, value, color, target]) => (
-                    <div key={label} onClick={() => {
-                      if (target === "projects") setView("projects");
-                      if (target === "leads") loadLeads();
-                      if (target === "reservations") loadReservations();
-                      if (target === "contacts") loadContacts();
-                    }} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "18px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", cursor: target ? "pointer" : "default", transition: "transform 0.15s" }}
-                      onMouseEnter={e => { if (target) e.currentTarget.style.transform = "translateY(-2px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = ""; }}
-                    >
-                      <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-                      <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
-                      <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>{label}</div>
+                  {stats.map(([icon, label, value, color, onClick]) => (
+                    <div key={label} onClick={onClick} style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, boxShadow: "0 1px 6px rgba(10,30,60,0.06)", padding: "18px 20px", cursor: onClick ? "pointer" : "default" }}>
+                      <div style={{ fontSize: 26, marginBottom: 8 }}>{icon}</div>
+                      <div style={{ fontSize: 26, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                      <div style={{ fontSize: 12, color: C.muted }}>{label}</div>
                     </div>
                   ))}
                 </div>
               );
             })()}
-
-            {/* Projekty přehled */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-              {projects.map(p => {
-                const avail = p.total_units - p.sold_units;
-                const pct = p.total_units > 0 ? Math.round((p.sold_units / p.total_units) * 100) : 0;
-                const isSoon = p.total_units === 0;
-                return (
-                  <div key={p.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</div>
-                        <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>📍 {p.location}</div>
-                      </div>
-                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: isSoon ? "#FAEEDA" : avail === 0 ? "#f0f0f0" : "#E1F5EE", color: isSoon ? "#633806" : avail === 0 ? "#666" : "#0F6E56", fontWeight: 500 }}>
-                        {isSoon ? "Připravujeme" : avail === 0 ? "Vyprodáno" : `${avail} volných`}
-                      </span>
-                    </div>
-                    <div style={{ height: 6, background: "#f0f0f0", borderRadius: 3, marginBottom: 8 }}>
-                      <div style={{ height: 6, width: `${pct}%`, background: pct === 100 ? "#aaa" : "#1D9E75", borderRadius: 3 }} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#999" }}>
-                      <span>Prodáno {pct}%</span>
-                      <span>Dokončení {p.completion}</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                      <button onClick={() => loadUnits(p)} style={{ flex: 1, background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
-                      <button onClick={() => loadMilestones(p)} style={{ flex: 1, background: "#EEF3FA", color: "#1A3A6B", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}>Timeline</button>
-                      <button onClick={() => { setForm(p); setView("editProject"); }} style={{ flex: 1, background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                    </div>
+            <Card style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 16 }}>Prodejnost projektů</div>
+              {projects.map(p => { const pct = p.total_units > 0 ? Math.round((p.sold_units / p.total_units) * 100) : 0; return (
+                <div key={p.id} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 4 }}><span>{p.name}</span><span>{p.sold_units}/{p.total_units} ({pct}%)</span></div>
+                  <div style={{ height: 8, background: C.border, borderRadius: 4 }}><div style={{ height: 8, width: `${pct}%`, background: pct === 100 ? "#aaa" : C.accent, borderRadius: 4 }} /></div>
+                </div>
+              ); })}
+            </Card>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              {projects.map(p => { const avail = p.total_units - p.sold_units; const pct = p.total_units > 0 ? Math.round((p.sold_units / p.total_units) * 100) : 0; return (
+                <Card key={p.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                    <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{p.name}</div><div style={{ fontSize: 12, color: C.muted }}>📍 {p.location}</div></div>
+                    <Badge bg={avail === 0 ? "#f0f0f0" : C.accentLight} color={avail === 0 ? "#666" : "#0F6E56"}>{avail === 0 ? "Vyprodáno" : `${avail} volných`}</Badge>
                   </div>
-                );
-              })}
+                  <div style={{ height: 6, background: C.border, borderRadius: 3, marginBottom: 12 }}><div style={{ height: 6, width: `${pct}%`, background: C.accent, borderRadius: 3 }} /></div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => loadUnits(p)} style={{ flex: 1, background: C.accentLight, color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
+                    <button onClick={() => loadMilestones(p)} style={{ flex: 1, background: C.blueLight, color: C.blue, border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}>Timeline</button>
+                    <button onClick={() => { setForm(p); setView("editProject"); }} style={{ flex: 1, background: "#f0f0f0", color: "#444", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
+                  </div>
+                </Card>
+              ); })}
             </div>
           </>
         )}
 
         {/* PROJEKTY */}
-        {!loading && view === "projects" && (
+        {view === "projects" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Projekty ({projects.length})</div>
-              <button onClick={() => { setForm({}); setView("editProject"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový projekt</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Projekty ({projects.length})</h2>
+              <Btn onClick={() => { setForm({}); setView("editProject"); }}>+ Nový projekt</Btn>
             </div>
-            {projects.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné projekty.</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {projects.map(p => (
-                <div key={p.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{p.location} · od {p.price_from?.toLocaleString("cs-CZ")} Kč · {p.total_units} bytů</div>
-                  </div>
+                <Card key={p.id} style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{p.name}</div><div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{p.location} · {p.total_units} bytů</div></div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => { setFilterDisp("Vše"); loadUnits(p); }} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Byty</button>
-                    <button onClick={() => loadMilestones(p)} style={{ background: "#EEF3FA", color: "#1A3A6B", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>Timeline</button>
-                    <button onClick={() => { setForm(p); setView("editProject"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                    <button onClick={() => deleteProject(p.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
+                    <Btn onClick={() => loadUnits(p)} variant="secondary" size="sm">🏠 Byty</Btn>
+                    <Btn onClick={() => loadMilestones(p)} size="sm" style={{ background: C.blueLight, color: C.blue, border: "none" }}>📅 Timeline</Btn>
+                    <Btn onClick={() => { setForm(p); setView("editProject"); }} variant="ghost" size="sm">Upravit</Btn>
+                    <Btn onClick={() => deleteProject(p.id)} variant="danger" size="sm">Smazat</Btn>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           </>
         )}
 
         {/* EDIT PROJEKT */}
-        {!loading && view === "editProject" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 16 }}>{form.id ? "Upravit projekt" : "Nový projekt"}</div>
-
-            <div style={{ marginBottom: 16, padding: 14, background: "#E1F5EE", borderRadius: 10, border: "0.5px solid #9FE1CB" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F6E56", marginBottom: 8 }}>📄 Nahrát PDF projektu — automatické vyplnění</div>
-              <input type="file" accept=".pdf" onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = async (ev) => {
-                  const base64 = ev.target.result.split(",")[1];
-                  setPdfLoading(true);
-                  try {
-                    const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/extract-pdf", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZ21vb2FtcHVnZHVla25ncHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk5NTIsImV4cCI6MjA5NTE0NTk1Mn0.MlEpjp1Zd__n837vv3N54y-c-lNtrHQp56Nprm5T4UE`,
-                      },
-                      body: JSON.stringify({ pdfBase64: base64 }),
-                    });
-                    const parsed = await res.json();
-                    setForm(f => ({ ...f, ...parsed }));
-                  } catch (err) { alert("Chyba při zpracování PDF: " + err.message); }
-                  setPdfLoading(false);
-                };
-                reader.readAsDataURL(file);
-              }} style={{ fontSize: 13 }} />
-              {pdfLoading && <div style={{ marginTop: 8, fontSize: 13, color: "#0F6E56" }}>⏳ Zpracovávám PDF...</div>}
+        {view === "editProject" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <button onClick={() => { setView("projects"); setForm({}); setSuggestions([]); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Projekty</button>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>{form.id ? "Upravit projekt" : "Nový projekt"}</h2>
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Název projektu *" field="name" obj={form} setObj={setForm} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, position: "relative" }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Lokalita / Adresa</label>
-                <input type="text" value={form.location || ""} onChange={e => searchAddress(e.target.value)} placeholder="Začněte psát adresu..."
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-                {suggestions.length > 0 && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "0.5px solid #ddd", borderRadius: 8, zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", marginTop: 2 }}>
-                    {suggestions.map((s, i) => (
-                      <div key={i} onClick={() => selectAddress(s)} style={{ padding: "10px 12px", fontSize: 12, color: "#333", cursor: "pointer", borderBottom: i < suggestions.length - 1 ? "0.5px solid #f0f0f0" : "none" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#f7f7f5"}
-                        onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
-                        {s.display_name}
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>📄 PDF Import</div>
+              <input type="file" accept=".pdf" onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (ev) => { const base64 = ev.target.result.split(",")[1]; setPdfLoading(true); try { const res = await fetch("https://trgmooampugduekngpxb.supabase.co/functions/v1/extract-pdf", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${ANON_KEY}` }, body: JSON.stringify({ pdfBase64: base64 }) }); const parsed = await res.json(); setForm(f => ({ ...f, ...parsed })); } catch (err) { alert("Chyba: " + err.message); } setPdfLoading(false); }; reader.readAsDataURL(file); }} style={{ fontSize: 13 }} />
+              {pdfLoading && <div style={{ marginTop: 8, fontSize: 13, color: C.accent }}>⏳ Zpracovávám PDF...</div>}
+            </Card>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Základní info</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Název projektu *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></FormField>
+                <FormField label="Lokalita / Adresa">
+                  <div style={{ position: "relative" }}>
+                    <input type="text" value={form.location || ""} onChange={e => searchAddress(e.target.value)} placeholder="Začněte psát adresu..." style={inputStyle} />
+                    {suggestions.length > 0 && (
+                      <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: `1px solid ${C.border}`, borderRadius: 9, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", marginTop: 2 }}>
+                        {suggestions.map((s, i) => <div key={i} onClick={() => selectAddress(s)} style={{ padding: "10px 12px", fontSize: 12, color: C.text, cursor: "pointer", borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : "none" }}>{s.display_name}</div>)}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
+                </FormField>
+                <FormField label="Typ"><SelectInput value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))} options={[["Novostavba","Novostavba"],["Rekonstrukce","Rekonstrukce"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Dokončení"><TextInput value={form.completion} onChange={v => setForm(f => ({ ...f, completion: v }))} placeholder="Q4 2026" /></FormField>
+                <FormField label="Cena od (Kč)"><TextInput value={form.price_from} onChange={v => setForm(f => ({ ...f, price_from: parseInt(v) || 0 }))} type="number" /></FormField>
+                <FormField label="Celkem bytů"><TextInput value={form.total_units} onChange={v => setForm(f => ({ ...f, total_units: parseInt(v) || 0 }))} type="number" /></FormField>
+                <FormField label="Prodaných bytů"><TextInput value={form.sold_units} onChange={v => setForm(f => ({ ...f, sold_units: parseInt(v) || 0 }))} type="number" /></FormField>
+                <FormField label="Počet podlaží"><TextInput value={form.floors} onChange={v => setForm(f => ({ ...f, floors: parseInt(v) || 0 }))} type="number" /></FormField>
+                <FormField label="Popis" span><textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ ...inputStyle, height: 80, resize: "none" }} /></FormField>
               </div>
-              <Select label="Typ" field="type" options={["Novostavba", "Rekonstrukce"]} obj={form} setObj={setForm} />
-              <Input label="Dokončení (např. Q2 2026)" field="completion" obj={form} setObj={setForm} />
-              <Input label="Cena od (Kč)" field="price_from" type="number" obj={form} setObj={setForm} />
-              <Input label="Celkem bytů" field="total_units" type="number" obj={form} setObj={setForm} />
-              <Input label="Prodaných bytů" field="sold_units" type="number" obj={form} setObj={setForm} />
-              <Input label="Počet podlaží" field="floors" type="number" obj={form} setObj={setForm} />
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Popis</label>
-              <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                style={{ width: "100%", marginTop: 4, padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a", boxSizing: "border-box" }} />
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Logo firmy</label>
-              <input type="file" accept="image/*" onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const fileName = `logos/${Date.now()}-${file.name}`;
-                const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                if (!error) {
-                  const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                  setForm(f => ({ ...f, company_logo: urlData.publicUrl }));
-                }
-              }} style={{ marginTop: 6, fontSize: 13 }} />
-              {form.company_logo && <img src={form.company_logo} alt="Logo" style={{ height: 50, objectFit: "contain", marginTop: 8 }} />}
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotky projektu</label>
-              <input type="file" accept="image/*" multiple onChange={async (e) => {
-                const files = Array.from(e.target.files);
-                const urls = [];
-                for (const file of files) {
-                  const fileName = `${Date.now()}-${file.name}`;
-                  const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                  if (!error) {
-                    const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                    urls.push(urlData.publicUrl);
-                  }
-                }
-                setForm(f => ({ ...f, images: [...getImages(f.images), ...urls] }));
-              }} style={{ marginTop: 6, fontSize: 13 }} />
+            </Card>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Logo firmy</div>
+              <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const fileName = `logos/${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("project-images").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName); setForm(f => ({ ...f, company_logo: urlData.publicUrl })); } }} style={{ fontSize: 13 }} />
+              {form.company_logo && <img src={form.company_logo} alt="Logo" style={{ height: 50, objectFit: "contain", marginTop: 10 }} />}
+            </Card>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Fotky projektu</div>
+              <input type="file" accept="image/*" multiple onChange={async (e) => { const files = Array.from(e.target.files); const urls = []; for (const file of files) { const fileName = `${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("project-images").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName); urls.push(urlData.publicUrl); } } setForm(f => ({ ...f, images: [...getImages(f.images), ...urls] })); }} style={{ fontSize: 13 }} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                {getImages(form.images).map((url, i) => (
-                  <div key={i} style={{ position: "relative" }}>
-                    <img src={url} alt="" style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 8 }} />
-                    <button onClick={() => setForm(f => ({ ...f, images: getImages(f.images).filter((_, j) => j !== i) }))}
-                      style={{ position: "absolute", top: 2, right: 2, background: "#E24B4A", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer" }}>×</button>
-                  </div>
-                ))}
+                {getImages(form.images).map((url, i) => <div key={i} style={{ position: "relative" }}><img src={url} alt="" style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 8 }} /><button onClick={() => setForm(f => ({ ...f, images: getImages(f.images).filter((_, j) => j !== i) }))} style={{ position: "absolute", top: 2, right: 2, background: C.red, color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer" }}>×</button></div>)}
               </div>
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poloha na mapě (klikněte pro upřesnění)</label>
-              <div id="map-container" style={{ marginTop: 6, height: 300, borderRadius: 8, border: "0.5px solid #ddd" }}></div>
-              <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-                {form.lat ? `📍 ${form.lat.toFixed(5)}, ${form.lng.toFixed(5)}` : "Vyberte adresu nebo klikněte na mapu"}
+            </Card>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Poloha na mapě</div>
+              <div id="map-container" style={{ height: 280, borderRadius: 10, border: `1px solid ${C.border}` }}></div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{form.lat ? `📍 ${form.lat.toFixed(5)}, ${form.lng.toFixed(5)}` : "Klikněte na mapu nebo vyberte adresu"}</div>
+            </Card>
+            <Card style={{ marginBottom: 16, background: C.blueLight, border: `1px solid #C8D8F0` }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.blue, marginBottom: 12 }}>🏠 Generovat byty automaticky</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+                {["1+kk","2+kk","3+kk","4+kk"].map(disp => <div key={disp}><label style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase" }}>{disp}</label><input type="number" min="0" defaultValue="0" id={`gen-${disp}`} style={{ ...inputStyle, marginTop: 5 }} /></div>)}
               </div>
-            </div>
-
-            <div style={{ marginTop: 16, padding: 14, background: "#f7f7f5", borderRadius: 10, border: "0.5px solid #e8e8e8" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 10 }}>🏠 Generovat byty automaticky</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 10 }}>
-                {["1+kk", "2+kk", "3+kk", "4+kk"].map(disp => (
-                  <div key={disp} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{disp}</label>
-                    <input type="number" min="0" defaultValue="0" id={`gen-${disp}`}
-                      style={{ padding: "7px 10px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fff" }} />
-                  </div>
-                ))}
-              </div>
-              <button onClick={async () => {
-                if (!form.id) { alert("Nejdříve uložte projekt!"); return; }
-                const dispozice = ["1+kk", "2+kk", "3+kk", "4+kk"];
-                const units = [];
-                let counter = 1;
-                for (const disp of dispozice) {
-                  const count = parseInt(document.getElementById(`gen-${disp}`)?.value) || 0;
-                  for (let i = 0; i < count; i++) {
-                    units.push({ project_id: form.id, unit_number: counter++, disp, status: "available", floor: 1, area: 0, price: 0 });
-                  }
-                }
-                if (units.length === 0) { alert("Zadejte počty bytů!"); return; }
-                if (!window.confirm(`Vytvořit ${units.length} bytů?`)) return;
-                await supabase.from("units").insert(units);
-                alert(`Vytvořeno ${units.length} bytů!`);
-              }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                Generovat byty
-              </button>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveProject} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              <button onClick={() => { setView("projects"); setForm({}); setSuggestions([]); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
+              <Btn variant="dark" onClick={async () => { if (!form.id) { alert("Nejdříve uložte projekt!"); return; } const units = []; let counter = 1; for (const disp of ["1+kk","2+kk","3+kk","4+kk"]) { const count = parseInt(document.getElementById(`gen-${disp}`)?.value) || 0; for (let i = 0; i < count; i++) { units.push({ project_id: form.id, unit_number: counter++, disp, status: "available", floor: 1, area: 0, price: 0 }); } } if (units.length === 0) { alert("Zadejte počty!"); return; } if (!window.confirm(`Vytvořit ${units.length} bytů?`)) return; await supabase.from("units").insert(units); alert(`Vytvořeno ${units.length} bytů!`); }}>Generovat byty</Btn>
+            </Card>
+            <div style={{ display: "flex", gap: 10 }}><Btn onClick={saveProject} size="lg">Uložit projekt</Btn><Btn onClick={() => { setView("projects"); setForm({}); setSuggestions([]); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
         )}
 
-        {/* BYTY SEZNAM */}
-        {!loading && view === "units" && selectedProject && (
+        {/* BYTY */}
+        {view === "units" && selectedProject && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>{selectedProject.name} — Byty ({selectedProject.units?.length || 0})</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0" }}>
-                  {["1+kk", "2+kk", "3+kk", "4+kk"].map(disp => {
-                    const total = selectedProject.units?.filter(u => u.disp === disp).length || 0;
-                    const avail = selectedProject.units?.filter(u => u.disp === disp && u.status === "available").length || 0;
-                    if (total === 0) return null;
-                    return (
-                      <div key={disp} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "10px 16px", textAlign: "center" }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{disp}</div>
-                        <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{avail} volných / {total} celkem</div>
-                      </div>
-                    );
-                  })}
-                </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div><button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>{selectedProject.name} — Byty ({selectedProject.units?.length || 0})</h2></div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn variant="ghost" onClick={() => { const rows = selectedProject.units.map(u => ({ "Číslo": u.unit_number, "Dispozice": u.disp, "Plocha m²": u.area, "Cena bez DPH": u.price_net || "", "Cena s DPH": u.price_net ? Math.round(u.price_net * 1.12) : "", "Cena/m²": u.price_per_sqm || "", "Stav": u.status, "Kupující": u.buyer || "" })); const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Ceník"); XLSX.writeFile(wb, `cenik-${selectedProject.name}.xlsx`); }}>📊 Excel</Btn>
+                <Btn variant="ghost" onClick={async () => { const { generateCenikPDF: gen } = await import("./CenikPDF"); gen(selectedProject, selectedProject.units); }}>📄 PDF ceník</Btn>
+                <Btn onClick={() => { setUnitForm({}); setView("editUnit"); }}>+ Nový byt</Btn>
               </div>
-              <button onClick={() => { setUnitForm({}); setView("editUnit"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový byt</button>
-              <button onClick={() => {
-                const rows = selectedProject.units.map(u => ({
-                  "Číslo": u.unit_number,
-                  "Budova": u.building || "",
-                  "Patro": u.floor,
-                  "Dispozice": u.disp,
-                  "Plocha m²": u.area,
-                  "Orientace": u.orientation || "",
-                  "Balkon": u.balcony ? "Ano" : "Ne",
-                  "Typ balkonu": u.balcony_type || "",
-                  "Plocha balkonu": u.balcony_area || "",
-                  "Sklep": u.cellar ? "Ano" : "Ne",
-                  "Parkoviště": u.parking ? "Ano" : "Ne",
-                  "Cena bez DPH": u.price_net || "",
-                  "Cena s DPH": u.price_net ? Math.round(u.price_net * 1.12) : "",
-                  "Cena/m²": u.price_per_sqm || "",
-                  "Akční cena": u.price_action || "",
-                  "Stav": u.status,
-                  "Kupující": u.buyer || "",
-                  "Datum rezervace": u.reserved_at || "",
-                  "Datum smlouvy": u.contract_signed_at || "",
-                  "Poznámky": u.notes || "",
-                }));
-                const ws = XLSX.utils.json_to_sheet(rows);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Ceník");
-                XLSX.writeFile(wb, `cenik-${selectedProject.name}.xlsx`);
-              }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                📊 Export Excel
-              </button>
-              <button onClick={async () => {
-                const { generateCenikPDF } = await import("./CenikPDF");
-                generateCenikPDF(selectedProject, selectedProject.units);
-              }} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                📄 Export PDF ceník
-              </button>
             </div>
-            {(() => {
-              const dispTypes = ["Vše", ...new Set(selectedProject.units?.map(u => u.disp).filter(Boolean))];
-              const buildings = ["Vše", ...new Set(selectedProject.units?.map(u => u.building).filter(Boolean))];
-              return (
-                <>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {dispTypes.map(d => (
-                        <button key={d} onClick={() => setFilterDisp(d)} style={{
-                          border: filterDisp === d ? "none" : "0.5px solid #ddd",
-                          borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer",
-                          background: filterDisp === d ? "#1D9E75" : "#fff",
-                          color: filterDisp === d ? "#fff" : "#555",
-                        }}>{d}</button>
-                      ))}
-                    </div>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: "5px 10px", borderRadius: 20, border: "0.5px solid #ddd", fontSize: 12, background: "#fff", cursor: "pointer" }}>
-                      <option value="Vše">Všechny stavy</option>
-                      <option value="available">Volné</option>
-                      <option value="reserved">Rezervované</option>
-                      <option value="sold">Prodané</option>
-                      <option value="blocked">Blokované</option>
-                    </select>
-                    {buildings.length > 1 && (
-                      <select value={filterBuilding} onChange={e => setFilterBuilding(e.target.value)} style={{ padding: "5px 10px", borderRadius: 20, border: "0.5px solid #ddd", fontSize: 12, background: "#fff", cursor: "pointer" }}>
-                        {buildings.map(b => <option key={b} value={b}>{b === "Vše" ? "Všechny budovy" : `Budova ${b}`}</option>)}
-                      </select>
-                    )}
-                    <input type="number" placeholder="Max. cena Kč" value={filterPriceMax} onChange={e => setFilterPriceMax(e.target.value)}
-                      style={{ padding: "5px 12px", borderRadius: 20, border: "0.5px solid #ddd", fontSize: 12, width: 140 }} />
-                    {(filterDisp !== "Vše" || filterStatus !== "Vše" || filterBuilding !== "Vše" || filterPriceMax) && (
-                      <button onClick={() => { setFilterDisp("Vše"); setFilterStatus("Vše"); setFilterBuilding("Vše"); setFilterPriceMax(""); }}
-                        style={{ padding: "5px 12px", borderRadius: 20, border: "0.5px solid #E24B4A", fontSize: 12, background: "#FCEBEB", color: "#A32D2D", cursor: "pointer" }}>
-                        × Reset filtrů
-                      </button>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-            {selectedProject.units?.length > 0 && (() => {
-              const units = selectedProject.units;
-              const totalVolume = units.reduce((s, u) => s + (u.price_net || 0), 0);
-              const avgPriceM2 = units.filter(u => u.price_per_sqm > 0).reduce((s, u, _, a) => s + u.price_per_sqm / a.length, 0);
-              const byStatus = { available: 0, reserved: 0, sold: 0, blocked: 0 };
-              units.forEach(u => { if (byStatus[u.status] !== undefined) byStatus[u.status]++; });
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
-                  {[
-                    ["Celkový objem", totalVolume ? totalVolume.toLocaleString("cs-CZ") + " Kč" : "—"],
-                    ["Prům. cena/m²", avgPriceM2 ? Math.round(avgPriceM2).toLocaleString("cs-CZ") + " Kč" : "—"],
-                    ["Volné", byStatus.available],
-                    ["Rezervované", byStatus.reserved],
-                    ["Prodané", byStatus.sold],
-                    ["Blokované", byStatus.blocked],
-                  ].map(([l, v]) => (
-                    <div key={l} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 11, color: "#999" }}>{l}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{v}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-            {selectedProject.units?.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné byty.</div>}
+            {selectedProject.units?.length > 0 && (() => { const u = selectedProject.units; const avgM2 = u.filter(x => x.price_per_sqm > 0).reduce((s, x, _, a) => s + x.price_per_sqm / a.length, 0); const byStatus = { available: 0, reserved: 0, sold: 0, blocked: 0 }; u.forEach(x => { if (byStatus[x.status] !== undefined) byStatus[x.status]++; }); return (<div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>{[["Průměr/m²", avgM2 ? Math.round(avgM2).toLocaleString("cs-CZ")+" Kč" : "—", C.accent],["Volné", byStatus.available, "#0F6E56"],["Rezervované", byStatus.reserved, "#633806"],["Prodané", byStatus.sold, "#666"],["Blokované", byStatus.blocked, C.red]].map(([l, v, col]) => (<Card key={l} style={{ padding: "12px 14px" }}><div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 700, color: col }}>{v}</div></Card>))}</div>); })()}
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              {["Vše", ...new Set(selectedProject.units?.map(u => u.disp).filter(Boolean))].map(d => (<button key={d} onClick={() => setFilterDisp(d)} style={{ border: filterDisp === d ? "none" : `1px solid ${C.border}`, borderRadius: 20, padding: "5px 14px", fontSize: 12, cursor: "pointer", background: filterDisp === d ? C.accent : "#fff", color: filterDisp === d ? "#fff" : C.muted }}>{d}</button>))}
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...selectStyle, width: "auto", borderRadius: 20 }}><option value="Vše">Všechny stavy</option><option value="available">Volné</option><option value="reserved">Rezervované</option><option value="sold">Prodané</option><option value="blocked">Blokované</option></select>
+              <input type="number" placeholder="Max. cena Kč" value={filterPriceMax} onChange={e => setFilterPriceMax(e.target.value)} style={{ ...inputStyle, width: 140, borderRadius: 20 }} />
+              {(filterDisp !== "Vše" || filterStatus !== "Vše" || filterPriceMax) && (<button onClick={() => { setFilterDisp("Vše"); setFilterStatus("Vše"); setFilterPriceMax(""); }} style={{ padding: "5px 12px", borderRadius: 20, border: `1px solid ${C.red}`, fontSize: 12, background: C.redLight, color: C.red, cursor: "pointer" }}>× Reset</button>)}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {selectedProject.units?.filter(u => {
-                if (filterDisp !== "Vše" && u.disp !== filterDisp) return false;
-                if (filterStatus !== "Vše" && u.status !== filterStatus) return false;
-                if (filterBuilding !== "Vše" && u.building !== filterBuilding) return false;
-                if (filterPriceMax && (u.price_net || u.price || 0) > parseInt(filterPriceMax)) return false;
-                return true;
-              })?.map(u => {
-                const sc = statusColor(u.status);
-                return (
-                  <div key={u.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", gap: 16, alignItems: "center", flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", minWidth: 30 }}>#{u.unit_number}</div>
-                      <div style={{ fontSize: 13, color: "#666" }}>{u.disp} · {u.area} m²{u.building ? ` · Budova ${u.building}` : ""} · {u.floor}. p.</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{u.price_net ? u.price_net.toLocaleString("cs-CZ") + " Kč" : u.price ? u.price.toLocaleString("cs-CZ") + " Kč" : "—"}</div>
-                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.color, fontWeight: 500 }}>{statusLabel(u.status)}</span>
-                      {u.buyer && <div style={{ fontSize: 12, color: "#999" }}>👤 {u.buyer}</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => setPdfEditor({
-                        project: selectedProject,
-                        unit: u,
-                        agentPhotoSize: 100,
-                        agentPhotoShape: "circle",
-                        template: "minimal",
-                        colorHeader: "#04342C",
-                        colorPrice: "#04342C",
-                        colorAccent: "#1D9E75",
-                        photosPosition: "top",
-                        agentPosition: "bottom",
-                        priceSize: "large",
-                      })} style={{ background: "#E1F5EE", color: "#0F6E56", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>
-                        📄 PDF
-                      </button>
-                      <button onClick={() => { setUnitForm(u); setView("editUnit"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                      <button onClick={() => deleteUnit(u.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
-                    </div>
+              {(selectedProject.units?.filter(u => { if (filterDisp !== "Vše" && u.disp !== filterDisp) return false; if (filterStatus !== "Vše" && u.status !== filterStatus) return false; if (filterPriceMax && (u.price_net || 0) > parseInt(filterPriceMax)) return false; return true; }) || []).map(u => { const sc = statusColor(u.status); return (
+                <Card key={u.id} style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", gap: 14, alignItems: "center", flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: C.text, minWidth: 30 }}>#{u.unit_number}</div>
+                    <div style={{ fontSize: 13, color: C.muted }}>{u.disp} · {u.area} m²{u.building ? ` · B.${u.building}` : ""} · {u.floor}. p.</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{u.price_net ? u.price_net.toLocaleString("cs-CZ") + " Kč" : "—"}</div>
+                    <Badge bg={sc.bg} color={sc.color}>{statusLabel(u.status)}</Badge>
+                    {u.buyer && <div style={{ fontSize: 12, color: C.muted }}>👤 {u.buyer}</div>}
                   </div>
-                );
-              })}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn onClick={() => setPdfEditor({ project: selectedProject, unit: u, agentPhotoSize: 100, agentPhotoShape: "circle", template: "minimal", colorHeader: "#1A3A6B", colorPrice: "#04342C", colorAccent: "#1D9E75", photosPosition: "top", agentPosition: "bottom", priceSize: "large" })} variant="secondary" size="sm">📄 PDF</Btn>
+                    <Btn onClick={() => { setUnitForm(u); setView("editUnit"); }} variant="ghost" size="sm">Upravit</Btn>
+                    <Btn onClick={() => deleteUnit(u.id)} variant="danger" size="sm">Smazat</Btn>
+                  </div>
+                </Card>
+              ); })}
             </div>
           </>
         )}
 
         {/* EDIT BYT */}
-        {!loading && view === "editUnit" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-              <button onClick={() => { setView("units"); setUnitForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0 }}>← Byty</button>
+        {view === "editUnit" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <button onClick={() => { setView("units"); setUnitForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Byty</button>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>{unitForm.id ? "Upravit byt" : "Nový byt"} — {selectedProject?.name}</h2>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>{unitForm.id ? "Upravit byt" : "Nový byt"}</div>
-            <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>{selectedProject?.name}</div>
-
             <Section title="Základní info" first>
-              <Input label="Číslo jednotky *" field="unit_number" type="number" obj={unitForm} setObj={setUnitForm} />
-              <Input label="Budova" field="building" obj={unitForm} setObj={setUnitForm} />
-              <Input label="Patro" field="floor" type="number" obj={unitForm} setObj={setUnitForm} />
-              <Select label="Dispozice" field="disp" options={["1+kk", "2+kk", "3+kk", "4+kk"]} obj={unitForm} setObj={setUnitForm} />
+              <FormField label="Číslo jednotky *"><TextInput value={unitForm.unit_number} onChange={v => setUnitForm(f => ({ ...f, unit_number: parseInt(v) || 0 }))} type="number" /></FormField>
+              <FormField label="Budova"><TextInput value={unitForm.building} onChange={v => setUnitForm(f => ({ ...f, building: v }))} /></FormField>
+              <FormField label="Patro"><TextInput value={unitForm.floor} onChange={v => setUnitForm(f => ({ ...f, floor: parseInt(v) || 0 }))} type="number" /></FormField>
+              <FormField label="Dispozice"><SelectInput value={unitForm.disp} onChange={v => setUnitForm(f => ({ ...f, disp: v }))} options={[["1+kk","1+kk"],["2+kk","2+kk"],["3+kk","3+kk"],["4+kk","4+kk"]]} placeholder="-- vyberte --" /></FormField>
             </Section>
-
-            <Section title="Parametry bytu">
-              <Input label="Prodejní plocha (m²)" field="area" type="number" obj={unitForm} setObj={setUnitForm} />
-              <Select label="Orientace" field="orientation" options={["Sever", "Jih", "Východ", "Západ", "Jihovýchod", "Jihozápad", "Severovýchod", "Severozápad"]} obj={unitForm} setObj={setUnitForm} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Venkovní plocha</label>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <Checkbox label="Balkon/lodžie/terasa" field="balcony" obj={unitForm} setObj={setUnitForm} />
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <Select label="Typ venkovní plochy" field="balcony_type" options={["Balkon", "Lodžie", "Terasa"]} obj={unitForm} setObj={setUnitForm} />
-              </div>
-              <Input label="Plocha balkonu/lodžie/terasy (m²)" field="balcony_area" type="number" obj={unitForm} setObj={setUnitForm} />
-              <div style={{ display: "flex", gap: 16, alignItems: "center", paddingTop: 4 }}>
-                <Checkbox label="Sklep" field="cellar" obj={unitForm} setObj={setUnitForm} />
-                <Checkbox label="Parkovací místo" field="parking" obj={unitForm} setObj={setUnitForm} />
-              </div>
+            <Section title="Parametry">
+              <FormField label="Plocha (m²)"><TextInput value={unitForm.area} onChange={v => setUnitForm(f => ({ ...f, area: parseInt(v) || 0 }))} type="number" /></FormField>
+              <FormField label="Orientace"><SelectInput value={unitForm.orientation} onChange={v => setUnitForm(f => ({ ...f, orientation: v }))} options={[["Sever","Sever"],["Jih","Jih"],["Východ","Východ"],["Západ","Západ"],["Jihovýchod","Jihovýchod"],["Jihozápad","Jihozápad"]]} placeholder="-- vyberte --" /></FormField>
+              <div><CheckboxField label="Balkon/lodžie/terasa" checked={unitForm.balcony} onChange={v => setUnitForm(f => ({ ...f, balcony: v }))} /><div style={{ marginTop: 8 }}><SelectInput value={unitForm.balcony_type} onChange={v => setUnitForm(f => ({ ...f, balcony_type: v }))} options={[["Balkon","Balkon"],["Lodžie","Lodžie"],["Terasa","Terasa"]]} placeholder="-- typ --" /></div></div>
+              <FormField label="Plocha balkonu (m²)"><TextInput value={unitForm.balcony_area} onChange={v => setUnitForm(f => ({ ...f, balcony_area: parseFloat(v) || 0 }))} type="number" /></FormField>
+              <div style={{ display: "flex", gap: 16 }}><CheckboxField label="Sklep" checked={unitForm.cellar} onChange={v => setUnitForm(f => ({ ...f, cellar: v }))} /><CheckboxField label="Parkovací místo" checked={unitForm.parking} onChange={v => setUnitForm(f => ({ ...f, parking: v }))} /></div>
             </Section>
-
             <Section title="Ceny">
-              <Input label="Cena za m² (Kč)" field="price_per_sqm" type="number" obj={unitForm} setObj={(updater) => {
-                setUnitForm(prev => {
-                  const next = typeof updater === "function" ? updater(prev) : updater;
-                  const priceNet = next.price_per_sqm && next.area ? Math.round(next.price_per_sqm * next.area) : next.price_net;
-                  return { ...next, price_net: priceNet };
-                });
-              }} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Cena bez DPH (Kč)</label>
-                <div style={{ padding: "8px 12px", borderRadius: 8, background: "#f0f0f0", fontSize: 13, color: "#444" }}>
-                  {unitForm.price_net ? Math.round(unitForm.price_net).toLocaleString("cs-CZ") + " Kč" : "—"}
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Cena s DPH 12% (Kč)</label>
-                <div style={{ padding: "8px 12px", borderRadius: 8, background: "#f0f0f0", fontSize: 13, color: "#444" }}>
-                  {unitForm.price_net ? Math.round(unitForm.price_net * 1.12).toLocaleString("cs-CZ") + " Kč" : "—"}
-                </div>
-              </div>
-              <Input label="Akční cena bez DPH (Kč)" field="price_action" type="number" obj={unitForm} setObj={setUnitForm} />
-              <Input label="Poznámka k akční ceně" field="price_action_note" obj={unitForm} setObj={setUnitForm} />
-              <Input label="Rezervační cena (Kč)" field="price_reservation" type="number" obj={unitForm} setObj={setUnitForm} />
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1a1a1a", cursor: "pointer", gridColumn: "1 / -1" }}>
-                <input type="checkbox" checked={unitForm.price_public !== false}
-                  onChange={e => setUnitForm(f => ({ ...f, price_public: e.target.checked }))}
-                  style={{ accentColor: "#1D9E75" }} />
-                Zobrazit cenu veřejně na webu
-              </label>
+              <FormField label="Cena za m² (Kč)"><input type="number" value={unitForm.price_per_sqm || ""} onChange={e => { const psm = parseInt(e.target.value) || 0; const priceNet = psm && unitForm.area ? Math.round(psm * unitForm.area) : unitForm.price_net; setUnitForm(f => ({ ...f, price_per_sqm: psm, price_net: priceNet })); }} style={inputStyle} /></FormField>
+              <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", marginBottom: 5 }}>Cena bez DPH</div><div style={{ ...inputStyle, background: "#F0F4FA", color: C.muted }}>{unitForm.price_net ? Math.round(unitForm.price_net).toLocaleString("cs-CZ") + " Kč" : "—"}</div></div>
+              <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", marginBottom: 5 }}>Cena s DPH 12%</div><div style={{ ...inputStyle, background: "#F0F4FA", color: C.muted }}>{unitForm.price_net ? Math.round(unitForm.price_net * 1.12).toLocaleString("cs-CZ") + " Kč" : "—"}</div></div>
+              <FormField label="Akční cena (Kč)"><TextInput value={unitForm.price_action} onChange={v => setUnitForm(f => ({ ...f, price_action: parseInt(v) || null }))} type="number" /></FormField>
+              <div><CheckboxField label="Zobrazit cenu veřejně na webu" checked={unitForm.price_public !== false} onChange={v => setUnitForm(f => ({ ...f, price_public: v }))} /></div>
             </Section>
-
             <Section title="Fotky bytu">
               <div style={{ gridColumn: "1 / -1" }}>
-                <input type="file" accept="image/*" multiple onChange={async (e) => {
-                  const files = Array.from(e.target.files);
-                  const urls = [];
-                  for (const file of files) {
-                    const fileName = `units/${Date.now()}-${file.name}`;
-                    const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                    if (!error) {
-                      const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                      urls.push(urlData.publicUrl);
-                    }
-                  }
-                  setUnitForm(f => ({ ...f, images: [...(Array.isArray(f.images) ? f.images : []), ...urls] }));
-                }} style={{ fontSize: 13 }} />
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                  {(Array.isArray(unitForm.images) ? unitForm.images : []).map((url, i) => (
-                    <div key={i} style={{ position: "relative" }}>
-                      <img src={url} alt="" style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 8 }} />
-                      <button onClick={() => setUnitForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
-                        style={{ position: "absolute", top: 2, right: 2, background: "#E24B4A", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer" }}>×</button>
-                    </div>
-                  ))}
-                </div>
+                <input type="file" accept="image/*" multiple onChange={async (e) => { const files = Array.from(e.target.files); const urls = []; for (const file of files) { const fileName = `units/${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("project-images").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName); urls.push(urlData.publicUrl); } } setUnitForm(f => ({ ...f, images: [...(Array.isArray(f.images) ? f.images : []), ...urls] })); }} style={{ fontSize: 13 }} />
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>{(Array.isArray(unitForm.images) ? unitForm.images : []).map((url, i) => <div key={i} style={{ position: "relative" }}><img src={url} alt="" style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 8 }} /><button onClick={() => setUnitForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))} style={{ position: "absolute", top: 2, right: 2, background: C.red, color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer" }}>×</button></div>)}</div>
               </div>
             </Section>
-
-            <Section title="Půdorys jednotky">
+            <Section title="Půdorys">
               <div style={{ gridColumn: "1 / -1" }}>
-                <input type="file" accept="image/*,.pdf" onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
-                  const fileName = `floorplans/${Date.now()}-${file.name}`;
-                  const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                  if (!error) {
-                    const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                    setUnitForm(f => ({ ...f, floor_plan: urlData.publicUrl }));
-                  }
-                }} style={{ fontSize: 13 }} />
-                {unitForm.floor_plan && (
-                  <div style={{ marginTop: 10, position: "relative", display: "inline-block" }}>
-                    <img src={unitForm.floor_plan} alt="Půdorys" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, border: "0.5px solid #ddd" }} />
-                    <button onClick={() => setUnitForm(f => ({ ...f, floor_plan: null }))}
-                      style={{ position: "absolute", top: 4, right: 4, background: "#E24B4A", color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, fontSize: 12, cursor: "pointer" }}>×</button>
-                  </div>
-                )}
+                <input type="file" accept="image/*,.pdf" onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const fileName = `floorplans/${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("project-images").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName); setUnitForm(f => ({ ...f, floor_plan: urlData.publicUrl })); } }} style={{ fontSize: 13 }} />
+                {unitForm.floor_plan && <div style={{ marginTop: 10, position: "relative", display: "inline-block" }}><img src={unitForm.floor_plan} alt="Půdorys" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8 }} /><button onClick={() => setUnitForm(f => ({ ...f, floor_plan: null }))} style={{ position: "absolute", top: 4, right: 4, background: C.red, color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, fontSize: 12, cursor: "pointer" }}>×</button></div>}
               </div>
             </Section>
-
             <Section title="Stav a obchod">
-              <Select label="Stav jednotky" field="status" options={["available", "reserved", "sold", "blocked", "withdrawn"]} obj={unitForm} setObj={setUnitForm} />
-              <Input label="Kupující / zájemce" field="buyer" obj={unitForm} setObj={setUnitForm} />
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — jméno</label>
-                <input type="text" value={unitForm.agent_name || ""} onChange={e => setUnitForm(f => ({ ...f, agent_name: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              <FormField label="Stav"><SelectInput value={unitForm.status} onChange={v => setUnitForm(f => ({ ...f, status: v }))} options={[["available","Volná"],["reserved","Rezervovaná"],["sold","Prodaná"],["blocked","Blokovaná"],["withdrawn","Stažená"]]} placeholder="-- vyberte --" /></FormField>
+              <FormField label="Kupující"><TextInput value={unitForm.buyer} onChange={v => setUnitForm(f => ({ ...f, buyer: v }))} /></FormField>
+              <FormField label="Makléř — jméno"><TextInput value={unitForm.agent_name} onChange={v => setUnitForm(f => ({ ...f, agent_name: v }))} /></FormField>
+              <FormField label="Makléř — telefon"><TextInput value={unitForm.agent_phone} onChange={v => setUnitForm(f => ({ ...f, agent_phone: v }))} /></FormField>
+              <FormField label="Makléř — email"><TextInput value={unitForm.agent_email} onChange={v => setUnitForm(f => ({ ...f, agent_email: v }))} /></FormField>
+              <FormField label="Makléř — web"><TextInput value={unitForm.agent_web} onChange={v => setUnitForm(f => ({ ...f, agent_web: v }))} /></FormField>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Fotka makléře</div>
+                {unitForm.agent_photo && <button onClick={() => setUnitForm(f => ({ ...f, agent_photo: "" }))} style={{ fontSize: 12, color: C.red, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 6 }}>× Odebrat fotku</button>}
+                <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const fileName = `agents/${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("project-images").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName); setUnitForm(f => ({ ...f, agent_photo: urlData.publicUrl })); } }} style={{ fontSize: 13 }} />
+                {unitForm.agent_photo && <img src={unitForm.agent_photo} alt="Makléř" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%", marginTop: 8 }} />}
               </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — telefon</label>
-                <input type="text" value={unitForm.agent_phone || ""} onChange={e => setUnitForm(f => ({ ...f, agent_phone: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — email</label>
-                <input type="text" value={unitForm.agent_email || ""} onChange={e => setUnitForm(f => ({ ...f, agent_email: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Makléř — webové stránky</label>
-                <input type="text" value={unitForm.agent_web || ""} onChange={e => setUnitForm(f => ({ ...f, agent_web: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotka makléře</label>
-                {unitForm.agent_photo && (
-                  <button onClick={() => setUnitForm(f => ({ ...f, agent_photo: "" }))}
-                    style={{ fontSize: 12, color: "#E24B4A", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 6 }}>
-                    × Odebrat fotku
-                  </button>
-                )}
-                <input type="file" accept="image/*" onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
-                  const fileName = `agents/${Date.now()}-${file.name}`;
-                  const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                  if (!error) {
-                    const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                    setUnitForm(f => ({ ...f, agent_photo: urlData.publicUrl }));
-                  }
-                }} style={{ fontSize: 13 }} />
-                {unitForm.agent_photo && <img src={unitForm.agent_photo} alt="Makler" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%", marginTop: 6 }} />}
-              </div>
-              <Input label="Datum rezervace" field="reserved_at" type="date" obj={unitForm} setObj={setUnitForm} />
-              <Input label="Datum podpisu smlouvy" field="contract_signed_at" type="date" obj={unitForm} setObj={setUnitForm} />
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
-                <textarea value={unitForm.notes || ""} onChange={e => setUnitForm(f => ({ ...f, notes: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
+              <FormField label="Datum rezervace"><input type="date" value={unitForm.reserved_at || ""} onChange={e => setUnitForm(f => ({ ...f, reserved_at: e.target.value }))} style={inputStyle} /></FormField>
+              <FormField label="Datum smlouvy"><input type="date" value={unitForm.contract_signed_at || ""} onChange={e => setUnitForm(f => ({ ...f, contract_signed_at: e.target.value }))} style={inputStyle} /></FormField>
+              <FormField label="Poznámky" span><textarea value={unitForm.notes || ""} onChange={e => setUnitForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, height: 70, resize: "none" }} /></FormField>
             </Section>
-
-            {unitForm.id && <PriceHistory unitId={unitForm.id} />}
-
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveUnit} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              <button onClick={() => { setView("units"); setUnitForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}><Btn onClick={saveUnit} size="lg">Uložit</Btn><Btn onClick={() => { setView("units"); setUnitForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
         )}
 
         {/* TIMELINE */}
-        {!loading && view === "milestones" && selectedProject && (
+        {view === "milestones" && selectedProject && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>{selectedProject.name} — Timeline</div>
-              </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div><button onClick={() => setView("projects")} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Projekty</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>{selectedProject.name} — Timeline</h2></div>
               <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { setMilestoneForm({}); setView("editMilestone"); }} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový milník</button>
-              <button onClick={async () => {
-                if (!window.confirm("Přidat typické milníky projektu?")) return;
-                const typicke = [
-                  { name: "Akvizice pozemku", order_index: 0 },
-                  { name: "Studie proveditelnosti", order_index: 1 },
-                  { name: "Dokumentace pro povolení", order_index: 2 },
-                  { name: "Stavební povolení", order_index: 3 },
-                  { name: "Výběr dodavatele", order_index: 4 },
-                  { name: "Zahájení výstavby", order_index: 5 },
-                  { name: "Hrubá stavba", order_index: 6 },
-                  { name: "Klientské změny", order_index: 7 },
-                  { name: "Kolaudace", order_index: 8 },
-                  { name: "Předání jednotek", order_index: 9 },
-                  { name: "Exit / prodej projektu", order_index: 10 },
-                ];
-                await supabase.from("milestones").insert(typicke.map(m => ({ ...m, project_id: selectedProject.id, status: "inactive" })));
-                loadMilestones(selectedProject);
-              }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
-                📋 Typické milníky
-              </button>
+                <Btn variant="ghost" onClick={async () => { if (!window.confirm("Přidat typické milníky?")) return; const typicke = ["Akvizice pozemku","Studie proveditelnosti","Dokumentace pro povolení","Stavební povolení","Výběr dodavatele","Zahájení výstavby","Hrubá stavba","Klientské změny","Kolaudace","Předání jednotek","Exit / prodej projektu"]; await supabase.from("milestones").insert(typicke.map((name, i) => ({ name, project_id: selectedProject.id, status: "inactive", order_index: i }))); loadMilestones(selectedProject); }}>📋 Typické milníky</Btn>
+                <Btn onClick={() => { setMilestoneForm({}); setView("editMilestone"); }}>+ Nový milník</Btn>
               </div>
             </div>
-
-            {/* Ganttův diagram */}
-            {milestones.length > 0 && (() => {
-              const allDates = milestones.flatMap(m => [m.date_from, m.date_to].filter(Boolean)).map(d => new Date(d));
-              const minDate = new Date(Math.min(...allDates));
-              const maxDate = new Date(Math.max(...allDates));
-              const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 1);
-              const statusColors = { inactive: "#e0e0e0", active: "#1D9E75", done: "#0F6E56", delayed: "#E24B4A" };
-              const statusLabels = { inactive: "Neaktivní", active: "Probíhá", done: "Hotovo", delayed: "Zpožděno" };
-
-              return (
-                <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 20, marginBottom: 16, overflowX: "auto" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 14 }}>Ganttův diagram</div>
-                  <div style={{ minWidth: 600 }}>
-                    {milestones.map(m => {
-                      if (!m.date_from || !m.date_to) return null;
-                      const start = (new Date(m.date_from) - minDate) / (1000 * 60 * 60 * 24);
-                      const duration = (new Date(m.date_to) - new Date(m.date_from)) / (1000 * 60 * 60 * 24);
-                      const left = (start / totalDays) * 100;
-                      const width = Math.max((duration / totalDays) * 100, 1);
-                      const color = statusColors[m.status] || "#e0e0e0";
-                      const today = new Date();
-                      const isDelayed = m.status !== "done" && new Date(m.date_to) < today;
-
-                      return (
-                        <div key={m.id}>
-                          <div style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 10 }}>
-                            <div style={{ width: 160, fontSize: 11, color: "#333", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
-                            <div style={{ flex: 1, height: 24, background: "#f4f4f4", borderRadius: 4, position: "relative" }}>
-                              <div style={{
-                                position: "absolute", left: `${left}%`, width: `${width}%`,
-                                height: "100%", background: isDelayed ? "#E24B4A" : color,
-                                borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 6,
-                                minWidth: 4,
-                              }}>
-                                {width > 8 && <span style={{ fontSize: 9, color: "#fff", whiteSpace: "nowrap" }}>{m.date_from} – {m.date_to}</span>}
-                              </div>
-                            </div>
-                            <div style={{ width: 80, fontSize: 10, color: "#888", flexShrink: 0 }}>{statusLabels[m.status] || m.status}</div>
-                          </div>
-                          {m.depends_on && (() => {
-                            const dep = milestones.find(d => d.id === m.depends_on);
-                            return dep ? <div style={{ fontSize: 10, color: "#999", marginLeft: 170, marginTop: -4, marginBottom: 2 }}>↳ závisí na: <strong>{dep.name}</strong></div> : null;
-                          })()}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
-                    {Object.entries({ inactive: "Neaktivní", active: "Probíhá", done: "Hotovo", delayed: "Zpožděno" }).map(([k, v]) => (
-                      <div key={k} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" }}>
-                        <div style={{ width: 12, height: 12, borderRadius: 2, background: { inactive: "#e0e0e0", active: "#1D9E75", done: "#0F6E56", delayed: "#E24B4A" }[k] }} />
-                        {v}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Seznam milníků */}
+            {milestones.length > 0 && (() => { const allDates = milestones.flatMap(m => [m.date_from, m.date_to].filter(Boolean)).map(d => new Date(d)); const minDate = new Date(Math.min(...allDates)); const maxDate = new Date(Math.max(...allDates)); const totalDays = Math.max((maxDate - minDate) / (1000*60*60*24), 1); const sc = { inactive: "#e0e0e0", active: C.accent, done: "#0F6E56", delayed: C.red }; return (<Card style={{ marginBottom: 16, overflowX: "auto" }}><div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Ganttův diagram</div><div style={{ minWidth: 600 }}>{milestones.map(m => { if (!m.date_from || !m.date_to) return null; const start = (new Date(m.date_from) - minDate) / (1000*60*60*24); const duration = (new Date(m.date_to) - new Date(m.date_from)) / (1000*60*60*24); const left = (start / totalDays) * 100; const width = Math.max((duration / totalDays) * 100, 1); const isDelayed = m.status !== "done" && new Date(m.date_to) < new Date(); return (<div key={m.id} style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 10 }}><div style={{ width: 160, fontSize: 11, color: C.text, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div><div style={{ flex: 1, height: 22, background: C.border, borderRadius: 4, position: "relative" }}><div style={{ position: "absolute", left: `${left}%`, width: `${width}%`, height: "100%", background: isDelayed ? C.red : sc[m.status] || "#e0e0e0", borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 6, minWidth: 4 }}>{width > 8 && <span style={{ fontSize: 9, color: "#fff", whiteSpace: "nowrap" }}>{m.date_from} – {m.date_to}</span>}</div></div></div>); })}</div></Card>); })()}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {milestones.map(m => {
-                const today = new Date();
-                const isDelayed = m.status !== "done" && m.date_to && new Date(m.date_to) < today;
-                const isSoon = m.status !== "done" && m.date_to && new Date(m.date_to) - today < 30 * 24 * 60 * 60 * 1000;
-                return (
-                  <div key={m.id} style={{ background: "#fff", border: `0.5px solid ${isDelayed ? "#E24B4A" : "#e8e8e8"}`, borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{m.name}</div>
-                        {isDelayed && <span style={{ fontSize: 10, background: "#FCEBEB", color: "#A32D2D", padding: "2px 8px", borderRadius: 20 }}>Zpožděno</span>}
-                        {m.depends_on && (() => {
-                          const dep = milestones.find(d => d.id === m.depends_on);
-                          return dep && dep.status !== "done" ? (
-                            <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>⚠️ Čeká na: {dep.name}</span>
-                          ) : null;
-                        })()}
-                        {isSoon && !isDelayed && <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>Blíží se</span>}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
-                        {m.date_from} – {m.date_to}
-                        {m.responsible && ` · 👤 ${m.responsible}`}
-                      </div>
+              {milestones.map(m => { const isDelayed = m.status !== "done" && m.date_to && new Date(m.date_to) < new Date(); const dep = m.depends_on ? milestones.find(d => d.id === m.depends_on) : null; return (
+                <Card key={m.id} style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderLeft: `4px solid ${isDelayed ? C.red : m.status === "done" ? C.accent : C.border}` }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{m.name}</div>
+                      {isDelayed && <Badge bg={C.redLight} color={C.red}>Zpožděno</Badge>}
+                      {dep && dep.status !== "done" && <Badge bg={C.yellowLight} color="#633806">⚠️ Čeká na: {dep.name}</Badge>}
                     </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <select value={m.status} onChange={async e => {
-                        await supabase.from("milestones").update({ status: e.target.value }).eq("id", m.id);
-                        loadMilestones(selectedProject);
-                      }} style={{ padding: "5px 8px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 12, background: "#fafafa" }}>
-                        <option value="inactive">Neaktivní</option>
-                        <option value="active">Probíhá</option>
-                        <option value="done">Hotovo</option>
-                        <option value="delayed">Zpožděno</option>
-                      </select>
-                      <button onClick={() => { setMilestoneForm(m); setView("editMilestone"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                      <button onClick={() => deleteMilestone(m.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
-                    </div>
+                    <div style={{ fontSize: 12, color: C.muted }}>{m.date_from} – {m.date_to}{m.responsible && ` · 👤 ${m.responsible}`}</div>
                   </div>
-                );
-              })}
-              {milestones.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné milníky. Přidejte první.</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select value={m.status} onChange={async e => { await supabase.from("milestones").update({ status: e.target.value }).eq("id", m.id); loadMilestones(selectedProject); }} style={{ ...selectStyle, width: "auto", borderRadius: 20, fontSize: 12 }}><option value="inactive">Neaktivní</option><option value="active">Probíhá</option><option value="done">Hotovo</option><option value="delayed">Zpožděno</option></select>
+                    <Btn onClick={() => { setMilestoneForm(m); setView("editMilestone"); }} variant="ghost" size="sm">Upravit</Btn>
+                    <Btn onClick={() => deleteMilestone(m.id)} variant="danger" size="sm">Smazat</Btn>
+                  </div>
+                </Card>
+              ); })}
             </div>
           </>
         )}
 
         {/* EDIT MILESTONE */}
-        {!loading && view === "editMilestone" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <button onClick={() => { setView("milestones"); setMilestoneForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Timeline</button>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{milestoneForm.id ? "Upravit milník" : "Nový milník"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Název milníku *</label>
-                <input type="text" value={milestoneForm.name || ""} onChange={e => setMilestoneForm(f => ({ ...f, name: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+        {view === "editMilestone" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}><button onClick={() => { setView("milestones"); setMilestoneForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Timeline</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Milník</h2></div>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Název *" span><TextInput value={milestoneForm.name} onChange={v => setMilestoneForm(f => ({ ...f, name: v }))} /></FormField>
+                <FormField label="Datum od"><input type="date" value={milestoneForm.date_from || ""} onChange={e => setMilestoneForm(f => ({ ...f, date_from: e.target.value }))} style={inputStyle} /></FormField>
+                <FormField label="Datum do"><input type="date" value={milestoneForm.date_to || ""} onChange={e => setMilestoneForm(f => ({ ...f, date_to: e.target.value }))} style={inputStyle} /></FormField>
+                <FormField label="Odpovědná osoba"><TextInput value={milestoneForm.responsible} onChange={v => setMilestoneForm(f => ({ ...f, responsible: v }))} /></FormField>
+                <FormField label="Závisí na"><SelectInput value={milestoneForm.depends_on} onChange={v => setMilestoneForm(f => ({ ...f, depends_on: v || null }))} options={milestones.filter(m => m.id !== milestoneForm.id).map(m => [m.id, m.name])} placeholder="-- bez závislosti --" /></FormField>
+                <FormField label="Stav"><SelectInput value={milestoneForm.status} onChange={v => setMilestoneForm(f => ({ ...f, status: v }))} options={[["inactive","Neaktivní"],["active","Probíhá"],["done","Hotovo"],["delayed","Zpožděno"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Poznámky" span><textarea value={milestoneForm.notes || ""} onChange={e => setMilestoneForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, height: 70, resize: "none" }} /></FormField>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Datum od</label>
-                <input type="date" value={milestoneForm.date_from || ""} onChange={e => setMilestoneForm(f => ({ ...f, date_from: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Datum do</label>
-                <input type="date" value={milestoneForm.date_to || ""} onChange={e => setMilestoneForm(f => ({ ...f, date_to: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Odpovědná osoba</label>
-                <input type="text" value={milestoneForm.responsible || ""} onChange={e => setMilestoneForm(f => ({ ...f, responsible: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Závisí na milníku</label>
-                <select value={milestoneForm.depends_on || ""} onChange={e => setMilestoneForm(f => ({ ...f, depends_on: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez závislosti --</option>
-                  {milestones.filter(m => m.id !== milestoneForm.id).map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
-                <select value={milestoneForm.status || "inactive"} onChange={e => setMilestoneForm(f => ({ ...f, status: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="inactive">Neaktivní</option>
-                  <option value="active">Probíhá</option>
-                  <option value="done">Hotovo</option>
-                  <option value="delayed">Zpožděno</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
-                <textarea value={milestoneForm.notes || ""} onChange={e => setMilestoneForm(f => ({ ...f, notes: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveMilestone} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              <button onClick={() => { setView("milestones"); setMilestoneForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
+            </Card>
+            <div style={{ display: "flex", gap: 10 }}><Btn onClick={saveMilestone} size="lg">Uložit</Btn><Btn onClick={() => { setView("milestones"); setMilestoneForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
         )}
 
         {/* KONTAKTY */}
-        {!loading && view === "contacts" && (
+        {view === "contacts" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Kontakty ({contacts.length})</div>
-              <button onClick={() => { setContactForm({}); setView("editContact"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový kontakt</button>
-            </div>
-
-            <input type="text" placeholder="Hledat kontakt..." value={contactSearch} onChange={e => setContactSearch(e.target.value)}
-              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #ddd", fontSize: 13, marginBottom: 14, boxSizing: "border-box", background: "#fff" }} />
-
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Kontakty ({contacts.length})</h2><Btn onClick={() => { setContactForm({}); setView("editContact"); }}>+ Nový kontakt</Btn></div>
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-              <button onClick={() => setContactSearch("")} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "0.5px solid #ddd", background: !contactSearch.startsWith("__expiring") ? "#1D9E75" : "#fff", color: !contactSearch.startsWith("__expiring") ? "#fff" : "#555" }}>
-                Všechny
-              </button>
-              <button onClick={() => setContactSearch("__expiring")} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: "0.5px solid #ddd", background: contactSearch.startsWith("__expiring") ? "#FAEEDA" : "#fff", color: contactSearch.startsWith("__expiring") ? "#633806" : "#555" }}>
-                ⚠️ Expirující rezervace
-              </button>
+              <input type="text" placeholder="Hledat kontakt..." value={contactSearch} onChange={e => setContactSearch(e.target.value)} style={{ ...inputStyle, flex: 1, borderRadius: 20 }} />
+              <button onClick={() => setContactSearch("")} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: !contactSearch.startsWith("__expiring") ? C.accent : "#fff", color: !contactSearch.startsWith("__expiring") ? "#fff" : C.muted }}>Všechny</button>
+              <button onClick={() => setContactSearch("__expiring")} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: contactSearch.startsWith("__expiring") ? C.yellowLight : "#fff", color: contactSearch.startsWith("__expiring") ? "#633806" : C.muted }}>⚠️ Expirující</button>
             </div>
-
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {contacts.filter(c => {
-                if (contactSearch === "__expiring") {
-                  return reservations.some(r => r.contact_id === c.id && r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date());
-                }
-                return !contactSearch || c.name?.toLowerCase().includes(contactSearch.toLowerCase()) || c.email?.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone?.includes(contactSearch);
-              }).map(c => {
-                const statusColors = { lead: { bg: "#EEF3FA", color: "#1A3A6B" }, interested: { bg: "#FAEEDA", color: "#633806" }, reserved: { bg: "#E1F5EE", color: "#0F6E56" }, buyer: { bg: "#0F6E56", color: "#fff" }, lost: { bg: "#f0f0f0", color: "#666" } };
-                const statusLabels = { lead: "Zájemce", interested: "Má zájem", reserved: "Rezervoval", buyer: "Kupující", lost: "Ztracen" };
-                const sc = statusColors[c.status] || statusColors.lead;
-                return (
-                  <div key={c.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{c.name}</div>
-                          {reservations.some(r => r.contact_id === c.id && r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()) && (
-                            <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20, fontWeight: 500 }}>⚠️ Expiruje rezervace</span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color, fontWeight: 500 }}>{statusLabels[c.status] || c.status}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#999" }}>
-                        {c.phone && `📞 ${c.phone}`}
-                        {c.email && ` · ✉️ ${c.email}`}
-                        {c.projects?.name && ` · 🏗 ${c.projects.name}`}
-                        {c.units?.unit_number && ` · Byt č. ${c.units.unit_number} (${c.units.disp})`}
-                      </div>
-                      {c.note && <div style={{ fontSize: 12, color: "#aaa", marginTop: 4, fontStyle: "italic" }}>{c.note}</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => { setContactForm(c); setView("editContact"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                      <button onClick={() => deleteContact(c.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
-                    </div>
-                  </div>
-                );
+              {contacts.filter(c => { if (contactSearch === "__expiring") return reservations.some(r => r.contact_id === c.id && r.valid_until && new Date(r.valid_until) - new Date() < 3*24*60*60*1000 && new Date(r.valid_until) > new Date()); return !contactSearch || c.name?.toLowerCase().includes(contactSearch.toLowerCase()) || c.email?.toLowerCase().includes(contactSearch.toLowerCase()); }).map(c => {
+                const hasExpiring = reservations.some(r => r.contact_id === c.id && r.valid_until && new Date(r.valid_until) - new Date() < 3*24*60*60*1000 && new Date(r.valid_until) > new Date());
+                return (<Card key={c.id} style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}><div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{c.name}</div>{hasExpiring && <Badge bg={C.yellowLight} color="#633806">⚠️ Expiruje rezervace</Badge>}</div><div style={{ fontSize: 12, color: C.muted }}>{c.phone && `📞 ${c.phone}`}{c.email && ` · ✉️ ${c.email}`}{c.projects?.name && ` · 🏗 ${c.projects.name}`}</div></div>
+                  <div style={{ display: "flex", gap: 8 }}><Btn onClick={() => { setContactForm(c); setView("editContact"); }} variant="ghost" size="sm">Upravit</Btn><Btn onClick={() => deleteContact(c.id)} variant="danger" size="sm">Smazat</Btn></div>
+                </Card>);
               })}
-              {contacts.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné kontakty.</div>}
             </div>
           </>
         )}
 
         {/* EDIT KONTAKT */}
-        {!loading && view === "editContact" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Kontakty</button>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{contactForm.id ? "Upravit kontakt" : "Nový kontakt"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Jméno a příjmení *</label>
-                <input type="text" value={contactForm.name || ""} onChange={e => setContactForm(f => ({ ...f, name: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+        {view === "editContact" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}><button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Kontakty</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>{contactForm.id ? "Upravit kontakt" : "Nový kontakt"}</h2></div>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Jméno a příjmení *" span><TextInput value={contactForm.name} onChange={v => setContactForm(f => ({ ...f, name: v }))} /></FormField>
+                <FormField label="Telefon"><TextInput value={contactForm.phone} onChange={v => setContactForm(f => ({ ...f, phone: v }))} /></FormField>
+                <FormField label="E-mail"><TextInput value={contactForm.email} onChange={v => setContactForm(f => ({ ...f, email: v }))} type="email" /></FormField>
+                <FormField label="Typ kontaktu"><SelectInput value={contactForm.type} onChange={v => setContactForm(f => ({ ...f, type: v }))} options={[["zajemce","Zájemce"],["kupujici","Kupující"],["investor","Investor"],["makler","Makléř"],["partner","Partner"],["dodavatel","Dodavatel"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Zdroj kontaktu"><SelectInput value={contactForm.source} onChange={v => setContactForm(f => ({ ...f, source: v }))} options={[["web","Web"],["sreality","Sreality"],["bezrealitky","Bezrealitky"],["doporuceni","Doporučení"],["telefon","Telefon"],["email","E-mail"],["kampan","Kampaň"]]} placeholder="-- neznámý --" /></FormField>
+                <FormField label="Stav"><SelectInput value={contactForm.status} onChange={v => setContactForm(f => ({ ...f, status: v }))} options={[["lead","Zájemce"],["interested","Má zájem"],["reserved","Rezervoval"],["buyer","Kupující"],["lost","Ztracen"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Projekt"><SelectInput value={contactForm.project_id} onChange={v => setContactForm(f => ({ ...f, project_id: v || null }))} options={projects.map(p => [p.id, p.name])} placeholder="-- bez projektu --" /></FormField>
+                <div style={{ paddingTop: 20 }}><CheckboxField label="GDPR souhlas udělen" checked={contactForm.gdpr} onChange={v => setContactForm(f => ({ ...f, gdpr: v }))} /></div>
+                <FormField label="Poznámka" span><textarea value={contactForm.note || ""} onChange={e => setContactForm(f => ({ ...f, note: e.target.value }))} style={{ ...inputStyle, height: 70, resize: "none" }} /></FormField>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Telefon</label>
-                <input type="text" value={contactForm.phone || ""} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>E-mail</label>
-                <input type="email" value={contactForm.email || ""} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Typ kontaktu</label>
-                <select value={contactForm.type || "zajemce"} onChange={e => setContactForm(f => ({ ...f, type: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="zajemce">Zájemce</option>
-                  <option value="kupujici">Kupující</option>
-                  <option value="investor">Investor</option>
-                  <option value="makler">Makléř</option>
-                  <option value="partner">Partner</option>
-                  <option value="dodavatel">Dodavatel</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Zdroj kontaktu</label>
-                <select value={contactForm.source || ""} onChange={e => setContactForm(f => ({ ...f, source: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- neznámý --</option>
-                  <option value="web">Web</option>
-                  <option value="sreality">Sreality</option>
-                  <option value="bezrealitky">Bezrealitky</option>
-                  <option value="doporuceni">Doporučení</option>
-                  <option value="telefon">Telefon</option>
-                  <option value="email">E-mail</option>
-                  <option value="kampan">Kampaň</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="checkbox" checked={contactForm.gdpr || false} onChange={e => setContactForm(f => ({ ...f, gdpr: e.target.checked }))} style={{ accentColor: "#1D9E75" }} />
-                <label style={{ fontSize: 13, color: "#1a1a1a" }}>GDPR souhlas udělen</label>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
-                <select value={contactForm.status || "lead"} onChange={e => setContactForm(f => ({ ...f, status: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="lead">Zájemce</option>
-                  <option value="interested">Má zájem</option>
-                  <option value="reserved">Rezervoval</option>
-                  <option value="buyer">Kupující</option>
-                  <option value="lost">Ztracen</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Projekt</label>
-                <select value={contactForm.project_id || ""} onChange={e => setContactForm(f => ({ ...f, project_id: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez projektu --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámka</label>
-                <textarea value={contactForm.note || ""} onChange={e => setContactForm(f => ({ ...f, note: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-            </div>
-            {contactForm.id && <CommunicationLog contactId={contactForm.id} supabase={supabase} />}
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveContact} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              <button onClick={() => { setView("contacts"); setContactForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
+            </Card>
+            {contactForm.id && <CommunicationLog contactId={contactForm.id} />}
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}><Btn onClick={saveContact} size="lg">Uložit</Btn><Btn onClick={() => { setView("contacts"); setContactForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
         )}
 
-        {/* PIPELINE - LEADS */}
-        {!loading && view === "leads" && (
+        {/* PIPELINE */}
+        {view === "leads" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Obchodní pipeline ({leads.length})</div>
-              <button onClick={() => { setLeadForm({}); setView("editLead"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový lead</button>
-            </div>
-
-            {/* Kanban pipeline */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10, marginBottom: 20, overflowX: "auto" }}>
-              {[
-                ["new", "Nový", "#EEF3FA", "#1A3A6B"],
-                ["contacted", "Kontaktován", "#FFF8E6", "#7A4A0A"],
-                ["viewing", "Prohlídka", "#F0EFFE", "#4A3A9A"],
-                ["reservation", "Rezervace", "#E1F5EE", "#0F6E56"],
-                ["contract", "Smlouva", "#E8F5E9", "#1B5E20"],
-                ["closed", "Uzavřeno", "#E8F5E9", "#1B5E20"],
-                ["lost", "Ztraceno", "#FCEBEB", "#A32D2D"],
-              ].map(([status, label, bg, color]) => {
-                const statusLeads = leads.filter(l => l.status === status);
-                return (
-                  <div key={status} style={{ background: bg, borderRadius: 10, padding: "10px 8px", minHeight: 100 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 8, textAlign: "center" }}>{label} ({statusLeads.length})</div>
-                    {statusLeads.map(l => (
-                      <div key={l.id} onClick={() => { setLeadForm(l); setView("editLead"); }} style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", marginBottom: 6, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{l.contacts?.name}</div>
-                        <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>{l.projects?.name}</div>
-                        {l.preferred_disp && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{l.preferred_disp}</div>}
-                        {l.next_contact_date && (() => {
-                          const isOverdue = new Date(l.next_contact_date) < new Date();
-                          return <div style={{ fontSize: 10, color: isOverdue ? "#E24B4A" : "#aaa", marginTop: 2 }}>📅 {l.next_contact_date}</div>;
-                        })()}
-                      </div>
-                    ))}
-                  </div>
-                );
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Obchodní pipeline ({leads.length})</h2><Btn onClick={() => { setLeadForm({}); setView("editLead"); }}>+ Nový lead</Btn></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10, overflowX: "auto" }}>
+              {[["new","Nový",C.blueLight,C.blue],["contacted","Kontaktován",C.yellowLight,"#7A4A0A"],["viewing","Prohlídka","#F0EFFE","#4A3A9A"],["reservation","Rezervace",C.accentLight,"#0F6E56"],["contract","Smlouva","#E8F5E9","#1B5E20"],["closed","Uzavřeno","#E8F5E9","#1B5E20"],["lost","Ztraceno",C.redLight,C.red]].map(([status, label, bg, color]) => {
+                const sl = leads.filter(l => l.status === status);
+                return (<div key={status} style={{ background: bg, borderRadius: 12, padding: "12px 10px", minHeight: 100 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 10, textAlign: "center" }}>{label} ({sl.length})</div>
+                  {sl.map(l => (<div key={l.id} onClick={() => { setLeadForm(l); setView("editLead"); }} style={{ background: "#fff", borderRadius: 9, padding: "9px 11px", marginBottom: 7, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}><div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{l.contacts?.name}</div><div style={{ fontSize: 11, color: C.muted }}>{l.projects?.name}</div>{l.next_contact_date && <div style={{ fontSize: 10, color: new Date(l.next_contact_date) < new Date() ? C.red : C.muted, marginTop: 2 }}>📅 {l.next_contact_date}</div>}</div>))}
+                </div>);
               })}
             </div>
           </>
         )}
 
         {/* EDIT LEAD */}
-        {!loading && view === "editLead" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <button onClick={() => { setView("leads"); setLeadForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Pipeline</button>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{leadForm.id ? "Upravit lead" : "Nový lead"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt *</label>
-                <select value={leadForm.contact_id || ""} onChange={e => setLeadForm(f => ({ ...f, contact_id: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- vyberte kontakt --</option>
-                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+        {view === "editLead" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}><button onClick={() => { setView("leads"); setLeadForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Pipeline</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Lead</h2></div>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Kontakt *"><SelectInput value={leadForm.contact_id} onChange={v => setLeadForm(f => ({ ...f, contact_id: v }))} options={contacts.map(c => [c.id, c.name])} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Projekt"><SelectInput value={leadForm.project_id} onChange={v => setLeadForm(f => ({ ...f, project_id: v || null }))} options={projects.map(p => [p.id, p.name])} placeholder="-- bez projektu --" /></FormField>
+                <FormField label="Dispozice"><SelectInput value={leadForm.preferred_disp} onChange={v => setLeadForm(f => ({ ...f, preferred_disp: v }))} options={[["1+kk","1+kk"],["2+kk","2+kk"],["3+kk","3+kk"],["4+kk","4+kk"]]} placeholder="-- vše --" /></FormField>
+                <FormField label="Rozpočet (Kč)"><TextInput value={leadForm.budget} onChange={v => setLeadForm(f => ({ ...f, budget: parseInt(v) || null }))} type="number" /></FormField>
+                <FormField label="Stav leadu"><SelectInput value={leadForm.status} onChange={v => setLeadForm(f => ({ ...f, status: v }))} options={[["new","Nový"],["contacted","Kontaktován"],["viewing","Prohlídka"],["reservation","Rezervace"],["contract","Smlouva"],["closed","Uzavřeno"],["lost","Ztraceno"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Obchodník"><TextInput value={leadForm.assigned_to} onChange={v => setLeadForm(f => ({ ...f, assigned_to: v }))} /></FormField>
+                <FormField label="Pravděpodobnost (%)"><TextInput value={leadForm.probability} onChange={v => setLeadForm(f => ({ ...f, probability: parseInt(v) || 0 }))} type="number" /></FormField>
+                <FormField label="Termín kontaktu"><input type="date" value={leadForm.next_contact_date || ""} onChange={e => setLeadForm(f => ({ ...f, next_contact_date: e.target.value }))} style={inputStyle} /></FormField>
+                <FormField label="Další krok" span><TextInput value={leadForm.next_step} onChange={v => setLeadForm(f => ({ ...f, next_step: v }))} /></FormField>
+                <FormField label="Poznámky" span><textarea value={leadForm.notes || ""} onChange={e => setLeadForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, height: 70, resize: "none" }} /></FormField>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Projekt</label>
-                <select value={leadForm.project_id || ""} onChange={e => setLeadForm(f => ({ ...f, project_id: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez projektu --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Preferovaná dispozice</label>
-                <select value={leadForm.preferred_disp || ""} onChange={e => setLeadForm(f => ({ ...f, preferred_disp: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- vše --</option>
-                  {["1+kk", "2+kk", "3+kk", "4+kk"].map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Rozpočet (Kč)</label>
-                <input type="number" value={leadForm.budget || ""} onChange={e => setLeadForm(f => ({ ...f, budget: parseInt(e.target.value) || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav leadu</label>
-                <select value={leadForm.status || "new"} onChange={e => setLeadForm(f => ({ ...f, status: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="new">Nový</option>
-                  <option value="contacted">Kontaktován</option>
-                  <option value="viewing">Prohlídka</option>
-                  <option value="reservation">Rezervace</option>
-                  <option value="contract">Smlouva</option>
-                  <option value="closed">Uzavřeno</option>
-                  <option value="lost">Ztraceno</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Přiřazený obchodník</label>
-                <input type="text" value={leadForm.assigned_to || ""} onChange={e => setLeadForm(f => ({ ...f, assigned_to: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Pravděpodobnost uzavření (%)</label>
-                <input type="number" min="0" max="100" value={leadForm.probability || 0} onChange={e => setLeadForm(f => ({ ...f, probability: parseInt(e.target.value) || 0 }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Termín dalšího kontaktu</label>
-                <input type="date" value={leadForm.next_contact_date || ""} onChange={e => setLeadForm(f => ({ ...f, next_contact_date: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Další krok</label>
-                <input type="text" value={leadForm.next_step || ""} onChange={e => setLeadForm(f => ({ ...f, next_step: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
-                <textarea value={leadForm.notes || ""} onChange={e => setLeadForm(f => ({ ...f, notes: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveLead} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              {leadForm.id && <button onClick={() => deleteLead(leadForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
-              <button onClick={() => { setView("leads"); setLeadForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
+            </Card>
+            <div style={{ display: "flex", gap: 10 }}><Btn onClick={saveLead} size="lg">Uložit</Btn>{leadForm.id && <Btn onClick={() => deleteLead(leadForm.id)} variant="danger" size="lg">Smazat</Btn>}<Btn onClick={() => { setView("leads"); setLeadForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
         )}
 
         {/* REZERVACE */}
-        {!loading && view === "reservations" && (
+        {view === "reservations" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Rezervace ({reservations.length})</div>
-              <button onClick={() => { setReservationForm({}); setView("editReservation"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nová rezervace</button>
-            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Rezervace ({reservations.length})</h2><Btn onClick={() => { setReservationForm({}); setView("editReservation"); }}>+ Nová rezervace</Btn></div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {reservations.map(r => {
-                const isExpiring = r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000;
-                const isExpired = r.valid_until && new Date(r.valid_until) < new Date();
-                return (
-                  <div key={r.id} style={{ background: "#fff", border: `0.5px solid ${isExpired ? "#E24B4A" : isExpiring ? "#EF9F27" : "#e8e8e8"}`, borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{r.contacts?.name}</div>
-                        {isExpired && <span style={{ fontSize: 10, background: "#FCEBEB", color: "#A32D2D", padding: "2px 8px", borderRadius: 20 }}>Expirováno</span>}
-                        {isExpiring && !isExpired && <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>Brzy expiruje</span>}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#999" }}>
-                        Byt č. {r.units?.unit_number} · {r.units?.disp} · {r.units?.area} m²
-                        {r.reserved_at && ` · Rezervováno: ${r.reserved_at}`}
-                        {r.valid_until && ` · Platnost do: ${r.valid_until}`}
-                      </div>
-                      {r.reservation_fee && <div style={{ fontSize: 12, color: "#1D9E75", marginTop: 2, fontWeight: 600 }}>Záloha: {r.reservation_fee.toLocaleString("cs-CZ")} Kč</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => { setReservationForm(r); setView("editReservation"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                      <button onClick={() => deleteReservation(r.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
-                    </div>
-                  </div>
-                );
-              })}
-              {reservations.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné rezervace.</div>}
+              {reservations.map(r => { const isExpiring = r.valid_until && new Date(r.valid_until) - new Date() < 3*24*60*60*1000; const isExpired = r.valid_until && new Date(r.valid_until) < new Date(); return (
+                <Card key={r.id} style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderLeft: `4px solid ${isExpired ? C.red : isExpiring ? C.yellow : C.border}` }}>
+                  <div><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}><div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{r.contacts?.name}</div>{isExpired && <Badge bg={C.redLight} color={C.red}>Expirováno</Badge>}{isExpiring && !isExpired && <Badge bg={C.yellowLight} color="#633806">Brzy expiruje</Badge>}</div><div style={{ fontSize: 12, color: C.muted }}>Byt č. {r.units?.unit_number} · {r.units?.disp}{r.valid_until && ` · Platnost do: ${r.valid_until}`}</div>{r.reservation_fee && <div style={{ fontSize: 12, color: C.accent, marginTop: 2, fontWeight: 600 }}>Záloha: {r.reservation_fee.toLocaleString("cs-CZ")} Kč</div>}</div>
+                  <div style={{ display: "flex", gap: 8 }}><Btn onClick={() => { setReservationForm(r); setView("editReservation"); }} variant="ghost" size="sm">Upravit</Btn><Btn onClick={() => deleteReservation(r.id)} variant="danger" size="sm">Smazat</Btn></div>
+                </Card>
+              ); })}
             </div>
           </>
         )}
 
         {/* EDIT REZERVACE */}
-        {!loading && view === "editReservation" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Rezervace</button>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{reservationForm.id ? "Upravit rezervaci" : "Nová rezervace"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {reservationForm.unit_id && (() => {
-                const unit = selectedProject?.units?.find(u => u.id === reservationForm.unit_id);
-                return unit ? (
-                  <div style={{ gridColumn: "1 / -1", background: "#E1F5EE", borderRadius: 10, padding: "12px 16px", marginBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0F6E56" }}>Rezervace bytu</div>
-                    <div style={{ fontSize: 13, color: "#0F6E56", marginTop: 4 }}>
-                      Byt č. {unit.unit_number} · {unit.disp} · {unit.area} m² · {unit.floor}. patro
-                      {unit.price_net ? ` · ${unit.price_net.toLocaleString("cs-CZ")} Kč` : ""}
-                    </div>
-                  </div>
-                ) : null;
-              })()}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt *</label>
-                <select value={reservationForm.contact_id || ""} onChange={e => setReservationForm(f => ({ ...f, contact_id: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- vyberte kontakt --</option>
-                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
-                <select value={reservationForm.status || "active"} onChange={e => setReservationForm(f => ({ ...f, status: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="active">Aktivní</option>
-                  <option value="expired">Expirovaná</option>
-                  <option value="converted">Převedena na smlouvu</option>
-                  <option value="cancelled">Zrušena</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Datum rezervace</label>
-                <input type="date" value={reservationForm.reserved_at || ""} onChange={e => setReservationForm(f => ({ ...f, reserved_at: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Platnost do</label>
-                <input type="date" value={reservationForm.valid_until || ""} onChange={e => setReservationForm(f => ({ ...f, valid_until: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Rezervační poplatek (Kč)</label>
-                <input type="number" value={reservationForm.reservation_fee || ""} onChange={e => setReservationForm(f => ({ ...f, reservation_fee: parseInt(e.target.value) || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Dokumenty</label>
-                <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" multiple onChange={async (e) => {
-                  const files = Array.from(e.target.files);
-                  const urls = [];
-                  for (const file of files) {
-                    const fileName = `reservations/${Date.now()}-${file.name}`;
-                    const { error } = await supabase.storage.from("documents").upload(fileName, file);
-                    if (!error) {
-                      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName);
-                      urls.push({ name: file.name, url: urlData.publicUrl });
-                    }
-                  }
-                  const existing = Array.isArray(reservationForm.documents) ? reservationForm.documents : [];
-                  setReservationForm(f => ({ ...f, documents: [...existing, ...urls] }));
-                }} style={{ fontSize: 13 }} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                  {(Array.isArray(reservationForm.documents) ? reservationForm.documents : []).map((doc, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f7f7f5", borderRadius: 8, padding: "8px 12px" }}>
-                      <a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#1A3A6B", textDecoration: "none" }}>
-                        📄 {doc.name}
-                      </a>
-                      <button onClick={() => setReservationForm(f => ({ ...f, documents: f.documents.filter((_, j) => j !== i) }))}
-                        style={{ background: "none", border: "none", color: "#E24B4A", cursor: "pointer", fontSize: 16 }}>×</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámky</label>
-                <textarea value={reservationForm.notes || ""} onChange={e => setReservationForm(f => ({ ...f, notes: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 70, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveReservation} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              {reservationForm.id && <button onClick={() => deleteReservation(reservationForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
-              <button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
-        )}
-
-        {/* DOKUMENTY */}
-        {!loading && view === "documents" && (
+        {view === "editReservation" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Dokumenty ({documents.length})</div>
-              <button onClick={() => { setDocumentForm({}); setView("editDocument"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nahrát dokument</button>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-              <input type="text" placeholder="Hledat dokument..." value={documentSearch} onChange={e => setDocumentSearch(e.target.value)}
-                style={{ flex: 1, padding: "8px 14px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fff" }} />
-              {["all", "presentation", "drawing", "permit", "contract", "photo", "other"].map(f => (
-                <button key={f} onClick={() => setDocumentFilter(f)} style={{
-                  padding: "5px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer",
-                  border: "0.5px solid #ddd",
-                  background: documentFilter === f ? "#1D9E75" : "#fff",
-                  color: documentFilter === f ? "#fff" : "#555",
-                }}>
-                  {{"all": "Vše", "presentation": "Prezentace", "drawing": "Výkresy", "permit": "Povolení", "contract": "Smlouvy", "photo": "Fotky", "other": "Ostatní"}[f]}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-              {documents.filter(d => {
-                if (documentFilter !== "all" && d.type !== documentFilter) return false;
-                if (documentSearch && !d.name.toLowerCase().includes(documentSearch.toLowerCase())) return false;
-                return true;
-              }).map(d => {
-                const isPdf = d.file_name?.toLowerCase().endsWith(".pdf");
-                const isImage = ["jpg", "jpeg", "png", "webp"].some(ext => d.file_name?.toLowerCase().endsWith(ext));
-                return (
-                  <div key={d.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, overflow: "hidden" }}>
-                    {isImage ? (
-                      <img src={d.url} alt={d.name} style={{ width: "100%", height: 120, objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ height: 80, background: "#f4f7fc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>
-                        {isPdf ? "📄" : "📁"}
-                      </div>
-                    )}
-                    <div style={{ padding: "10px 12px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>{d.name}</div>
-                      <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>
-                        {d.projects?.name && `🏗 ${d.projects.name}`}
-                        {d.units?.unit_number && ` · Byt č. ${d.units.unit_number}`}
-                        {d.contacts?.name && ` · 👤 ${d.contacts.name}`}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: d.is_public ? "#E1F5EE" : "#f0f0f0", color: d.is_public ? "#0F6E56" : "#666" }}>
-                          {d.is_public ? "Veřejný" : "Interní"}
-                        </span>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#1A3A6B", textDecoration: "none" }}>👁 Náhled</a>
-                          <button onClick={() => { setDocumentForm(d); setView("editDocument"); }} style={{ background: "none", border: "none", fontSize: 12, color: "#666", cursor: "pointer" }}>✏️</button>
-                          <button onClick={() => deleteDocument(d.id, d.url)} style={{ background: "none", border: "none", fontSize: 12, color: "#E24B4A", cursor: "pointer" }}>×</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {documents.length === 0 && <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#aaa", padding: 40 }}>Žádné dokumenty.</div>}
-            </div>
-          </>
-        )}
-
-        {/* EDIT DOKUMENT */}
-        {!loading && view === "editDocument" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <button onClick={() => { setView("documents"); setDocumentForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Dokumenty</button>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{documentForm.id ? "Upravit dokument" : "Nahrát dokument"}</div>
-
-            {!documentForm.id && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Soubor</label>
-                <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dwg,.zip" onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
-                  const fileName = `docs/${Date.now()}-${file.name}`;
-                  const { error } = await supabase.storage.from("documents").upload(fileName, file);
-                  if (!error) {
-                    const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName);
-                    setDocumentForm(f => ({ ...f, url: urlData.publicUrl, file_name: file.name, file_size: file.size, name: f.name || file.name }));
-                  }
-                }} style={{ marginTop: 6, fontSize: 13, display: "block" }} />
-                {documentForm.url && <div style={{ fontSize: 12, color: "#1D9E75", marginTop: 6 }}>✓ Soubor nahrán: {documentForm.file_name}</div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}><button onClick={() => { setView("reservations"); setReservationForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Rezervace</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Rezervace</h2></div>
+            {reservationForm.unit_id && (() => { const unit = selectedProject?.units?.find(u => u.id === reservationForm.unit_id); return unit ? (<Card style={{ marginBottom: 16, background: C.accentLight, border: `1px solid #9FE1CB` }}><div style={{ fontSize: 13, fontWeight: 600, color: "#0F6E56" }}>Rezervace bytu</div><div style={{ fontSize: 13, color: "#0F6E56", marginTop: 4 }}>Byt č. {unit.unit_number} · {unit.disp} · {unit.area} m²</div></Card>) : null; })()}
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Projekt"><SelectInput value={reservationForm._project_id} onChange={async v => { setReservationForm(f => ({ ...f, _project_id: v, unit_id: null })); if (v) { const { data } = await supabase.from("units").select("id, unit_number, disp, floor, status").eq("project_id", v).order("unit_number"); setReservationForm(f => ({ ...f, _project_units: data || [] })); } }} options={projects.map(p => [p.id, p.name])} placeholder="-- vyberte projekt --" /></FormField>
+                <FormField label="Byt"><SelectInput value={reservationForm.unit_id} onChange={v => setReservationForm(f => ({ ...f, unit_id: v }))} options={(reservationForm._project_units || []).map(u => [u.id, `č. ${u.unit_number} · ${u.disp} · ${u.floor}. p.`])} placeholder="-- vyberte byt --" /></FormField>
+                <FormField label="Kontakt *"><SelectInput value={reservationForm.contact_id} onChange={v => setReservationForm(f => ({ ...f, contact_id: v }))} options={contacts.map(c => [c.id, c.name])} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Stav"><SelectInput value={reservationForm.status} onChange={v => setReservationForm(f => ({ ...f, status: v }))} options={[["active","Aktivní"],["expired","Expirovaná"],["converted","Převedena"],["cancelled","Zrušena"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Datum rezervace"><input type="date" value={reservationForm.reserved_at || ""} onChange={e => setReservationForm(f => ({ ...f, reserved_at: e.target.value }))} style={inputStyle} /></FormField>
+                <FormField label="Platnost do"><input type="date" value={reservationForm.valid_until || ""} onChange={e => setReservationForm(f => ({ ...f, valid_until: e.target.value }))} style={inputStyle} /></FormField>
+                <FormField label="Rezervační poplatek (Kč)"><TextInput value={reservationForm.reservation_fee} onChange={v => setReservationForm(f => ({ ...f, reservation_fee: parseInt(v) || null }))} type="number" /></FormField>
+                <div></div>
+                <FormField label="Dokumenty" span>
+                  <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" multiple onChange={async (e) => { const files = Array.from(e.target.files); const urls = []; for (const file of files) { const fileName = `reservations/${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("documents").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName); urls.push({ name: file.name, url: urlData.publicUrl }); } } const existing = Array.isArray(reservationForm.documents) ? reservationForm.documents : []; setReservationForm(f => ({ ...f, documents: [...existing, ...urls] })); }} style={{ fontSize: 13 }} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>{(Array.isArray(reservationForm.documents) ? reservationForm.documents : []).map((doc, i) => (<div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, borderRadius: 8, padding: "8px 12px" }}><a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: C.blue, textDecoration: "none" }}>📄 {doc.name}</a><button onClick={() => setReservationForm(f => ({ ...f, documents: f.documents.filter((_, j) => j !== i) }))} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 16 }}>×</button></div>))}</div>
+                </FormField>
+                <FormField label="Poznámky" span><textarea value={reservationForm.notes || ""} onChange={e => setReservationForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, height: 70, resize: "none" }} /></FormField>
               </div>
-            )}
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Název dokumentu *</label>
-                <input type="text" value={documentForm.name || ""} onChange={e => setDocumentForm(f => ({ ...f, name: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Typ dokumentu</label>
-                <select value={documentForm.type || "other"} onChange={e => setDocumentForm(f => ({ ...f, type: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="presentation">Projektová prezentace</option>
-                  <option value="drawing">Výkres / půdorys</option>
-                  <option value="permit">Stavební povolení</option>
-                  <option value="contract">Smlouva</option>
-                  <option value="reservation_contract">Rezervační smlouva</option>
-                  <option value="purchase_contract">Kupní smlouva</option>
-                  <option value="photo">Fotky ze stavby</option>
-                  <option value="visualization">Vizualizace</option>
-                  <option value="price_list">Cenový list</option>
-                  <option value="analysis">Konkurenční analýza</option>
-                  <option value="technical">Technická dokumentace</option>
-                  <option value="other">Ostatní</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Přiřadit k projektu</label>
-                <select value={documentForm.project_id || ""} onChange={e => setDocumentForm(f => ({ ...f, project_id: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez projektu --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Přiřadit ke kontaktu</label>
-                <select value={documentForm.contact_id || ""} onChange={e => setDocumentForm(f => ({ ...f, contact_id: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez kontaktu --</option>
-                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 20 }}>
-                <input type="checkbox" checked={documentForm.is_public || false} onChange={e => setDocumentForm(f => ({ ...f, is_public: e.target.checked }))} style={{ accentColor: "#1D9E75" }} />
-                <label style={{ fontSize: 13, color: "#1a1a1a" }}>Veřejný dokument (viditelný zákazníkům)</label>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveDocument} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              <button onClick={() => { setView("documents"); setDocumentForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
-        )}
-
-        {/* UŽIVATELÉ */}
-        {!loading && view === "users" && currentUser?.role === "admin" && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Uživatelé ({adminUsers.length})</div>
-              <button onClick={() => setUserForm({ role: "agent" })} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový uživatel</button>
-            </div>
-
-            {userForm.role !== undefined && (
-              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 14 }}>{userForm.id ? "Upravit uživatele" : "Nový uživatel"}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Celé jméno</label>
-                    <input type="text" value={userForm.full_name || ""} onChange={e => setUserForm(f => ({ ...f, full_name: e.target.value }))}
-                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Uživatelské jméno *</label>
-                    <input type="text" value={userForm.username || ""} onChange={e => setUserForm(f => ({ ...f, username: e.target.value }))}
-                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Heslo {userForm.id ? "(prázdné = beze změny)" : "*"}</label>
-                    <input type="password" value={userForm.password || ""} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
-                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>E-mail</label>
-                    <input type="email" value={userForm.email || ""} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))}
-                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Role</label>
-                    <select value={userForm.role || "agent"} onChange={e => setUserForm(f => ({ ...f, role: e.target.value }))}
-                      style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                      <option value="admin">Admin — plný přístup</option>
-                      <option value="agent">Makléř — omezený přístup</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                  <button onClick={saveAdminUser} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-                  <button onClick={() => setUserForm({})} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {adminUsers.map(u => (
-                <div key={u.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{u.full_name || u.username}</div>
-                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: u.role === "admin" ? "#EEF3FA" : "#E1F5EE", color: u.role === "admin" ? "#1A3A6B" : "#0F6E56", fontWeight: 500 }}>
-                        {u.role === "admin" ? "Admin" : "Makléř"}
-                      </span>
-                      {u.id === currentUser?.id && <span style={{ fontSize: 10, color: "#aaa" }}>(vy)</span>}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>@{u.username}{u.email && ` · ${u.email}`}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setUserForm(u)} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Upravit</button>
-                    {u.id !== currentUser?.id && (
-                      <button onClick={() => deleteAdminUser(u.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Smazat</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            </Card>
+            <div style={{ display: "flex", gap: 10 }}><Btn onClick={saveReservation} size="lg">Uložit</Btn>{reservationForm.id && <Btn onClick={() => deleteReservation(reservationForm.id)} variant="danger" size="lg">Smazat</Btn>}<Btn onClick={() => { setView("reservations"); setReservationForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
           </>
         )}
 
         {/* ÚKOLY */}
-        {!loading && view === "tasks" && (
+        {view === "tasks" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a" }}>Úkoly</div>
-              <button onClick={() => { setTaskForm({ priority: "medium", status: "todo" }); setView("editTask"); }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Nový úkol</button>
-            </div>
-
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Úkoly</h2><Btn onClick={() => { setTaskForm({ priority: "medium", status: "todo" }); setView("editTask"); }}>+ Nový úkol</Btn></div>
             <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-              {[
-                ["today", "📅 Dnes"],
-                ["week", "📆 Tento týden"],
-                ["todo", "🔵 Nesplněné"],
-                ["done", "✅ Splněné"],
-                ["all", "Vše"],
-              ].map(([f, l]) => (
-                <button key={f} onClick={() => setTaskFilter(f)} style={{
-                  padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer",
-                  border: "0.5px solid #ddd",
-                  background: taskFilter === f ? "#1D9E75" : "#fff",
-                  color: taskFilter === f ? "#fff" : "#555",
-                }}>{l}</button>
-              ))}
+              {[["today","📅 Dnes"],["week","📆 Týden"],["todo","🔵 Nesplněné"],["done","✅ Splněné"],["all","Vše"]].map(([f, l]) => (<button key={f} onClick={() => setTaskFilter(f)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: taskFilter === f ? C.accent : "#fff", color: taskFilter === f ? "#fff" : C.muted }}>{l}</button>))}
             </div>
-
-            {taskFilter === "today" && (() => {
-              const today = new Date().toISOString().split("T")[0];
-              const todayTasks = tasks.filter(t => t.due_date === today && t.status !== "done");
-              const overdue = tasks.filter(t => t.due_date < today && t.status !== "done");
-              return (
-                <div style={{ marginBottom: 16 }}>
-                  {overdue.length > 0 && (
-                    <div style={{ background: "#FCEBEB", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#A32D2D", marginBottom: 6 }}>⚠️ Po termínu ({overdue.length})</div>
-                      {overdue.map(t => (
-                        <div key={t.id} style={{ fontSize: 13, color: "#A32D2D", marginBottom: 4 }}>• {t.title} — {t.due_date}</div>
-                      ))}
-                    </div>
-                  )}
-                  {todayTasks.length === 0 && overdue.length === 0 && (
-                    <div style={{ textAlign: "center", color: "#aaa", padding: 20 }}>🎉 Dnes nemáte žádné úkoly!</div>
-                  )}
-                </div>
-              );
-            })()}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {tasks.filter(t => {
-                const today = new Date().toISOString().split("T")[0];
-                const weekEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-                if (taskFilter === "today") return t.due_date === today && t.status !== "done";
-                if (taskFilter === "week") return t.due_date <= weekEnd && t.status !== "done";
-                if (taskFilter === "todo") return t.status !== "done";
-                if (taskFilter === "done") return t.status === "done";
-                return true;
-              }).map(t => {
-                const today = new Date().toISOString().split("T")[0];
-                const isOverdue = t.due_date < today && t.status !== "done";
-                const isSoon = t.due_date === today && t.status !== "done";
-                const priorityColors = { high: "#E24B4A", medium: "#EF9F27", low: "#1D9E75" };
-                const priorityLabels = { high: "Vysoká", medium: "Střední", low: "Nízká" };
-                const typeIcons = {
-                  call: "📞", email: "✉️", meeting: "🤝", document: "📄",
-                  price: "💰", viewing: "🏠", contract: "📝", general: "✅"
-                };
-                const typeLabels = {
-                  call: "Hovor", email: "E-mail", meeting: "Schůzka", document: "Dokument",
-                  price: "Cena", viewing: "Prohlídka", contract: "Smlouva", general: "Obecný"
-                };
-                const checklist = Array.isArray(t.checklist) ? t.checklist : [];
-                const doneItems = checklist.filter(c => c.done).length;
-
+            {taskFilter === "today" && (() => { const today = new Date().toISOString().split("T")[0]; const overdue = tasks.filter(t => t.due_date < today && t.status !== "done"); return overdue.length > 0 ? (<div style={{ background: C.redLight, borderRadius: 10, padding: "10px 14px", marginBottom: 16 }}><div style={{ fontSize: 12, fontWeight: 700, color: C.red, marginBottom: 6 }}>⚠️ Po termínu ({overdue.length})</div>{overdue.map(t => <div key={t.id} style={{ fontSize: 13, color: C.red, marginBottom: 4 }}>• {t.title} — {t.due_date}</div>)}</div>) : null; })()}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {tasks.filter(t => { const today = new Date().toISOString().split("T")[0]; const weekEnd = new Date(Date.now() + 7*24*60*60*1000).toISOString().split("T")[0]; if (taskFilter === "today") return t.due_date === today && t.status !== "done"; if (taskFilter === "week") return t.due_date <= weekEnd && t.status !== "done"; if (taskFilter === "todo") return t.status !== "done"; if (taskFilter === "done") return t.status === "done"; return true; }).map(t => {
+                const today = new Date().toISOString().split("T")[0]; const isOverdue = t.due_date < today && t.status !== "done";
+                const pc = { high: C.red, medium: C.yellow, low: C.accent }; const pl = { high: "Vysoká", medium: "Střední", low: "Nízká" };
+                const ti = { call: "📞", email: "✉️", meeting: "🤝", document: "📄", price: "💰", viewing: "🏠", contract: "📝", general: "✅" };
+                const checklist = Array.isArray(t.checklist) ? t.checklist : []; const doneItems = checklist.filter(c => c.done).length;
                 return (
-                  <div key={t.id} style={{
-                    background: "#fff",
-                    border: `1px solid ${isOverdue ? "#E24B4A" : isSoon ? "#EF9F27" : "#e8e8e8"}`,
-                    borderLeft: `4px solid ${priorityColors[t.priority] || "#ddd"}`,
-                    borderRadius: 12, padding: "16px 18px",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-                  }}>
+                  <Card key={t.id} style={{ borderLeft: `4px solid ${isOverdue ? C.red : pc[t.priority] || C.border}` }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                      <button onClick={() => completeTask(t.id, t.status)} style={{
-                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0, marginTop: 2,
-                        border: `2px solid ${t.status === "done" ? "#1D9E75" : "#ddd"}`,
-                        background: t.status === "done" ? "#1D9E75" : "#fff",
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, color: "#fff"
-                      }}>
-                        {t.status === "done" ? "✓" : ""}
-                      </button>
-
+                      <button onClick={() => completeTask(t.id, t.status)} style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, marginTop: 2, border: `2px solid ${t.status === "done" ? C.accent : C.border}`, background: t.status === "done" ? C.accent : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff" }}>{t.status === "done" ? "✓" : ""}</button>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 18 }}>{typeIcons[t.type] || "✅"}</span>
-                          <span style={{ fontSize: 15, fontWeight: 600, color: t.status === "done" ? "#aaa" : "#1a1a1a", textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</span>
-                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: priorityColors[t.priority] + "20", color: priorityColors[t.priority], fontWeight: 600, marginLeft: "auto" }}>
-                            {priorityLabels[t.priority]}
-                          </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 18 }}>{ti[t.type] || "✅"}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: t.status === "done" ? C.muted : C.text, textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</span>
+                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: (pc[t.priority] || C.accent) + "20", color: pc[t.priority] || C.accent, fontWeight: 600, marginLeft: "auto" }}>{pl[t.priority]}</span>
                         </div>
-
-                        {t.description && <div style={{ fontSize: 13, color: "#666", marginBottom: 8, lineHeight: 1.5 }}>{t.description}</div>}
-
-                        {checklist.length > 0 && (
-                          <div style={{ marginBottom: 8 }}>
-                            <div style={{ height: 4, background: "#f0f0f0", borderRadius: 2, marginBottom: 6 }}>
-                              <div style={{ height: 4, width: `${checklist.length > 0 ? (doneItems / checklist.length) * 100 : 0}%`, background: "#1D9E75", borderRadius: 2 }} />
-                            </div>
-                            <div style={{ fontSize: 11, color: "#999" }}>{doneItems}/{checklist.length} splněno</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
-                              {checklist.map((item, i) => (
-                                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: item.done ? "#aaa" : "#333" }}>
-                                  <input type="checkbox" checked={item.done} onChange={async () => {
-                                    const newChecklist = checklist.map((c, j) => j === i ? { ...c, done: !c.done } : c);
-                                    await supabase.from("tasks").update({ checklist: newChecklist }).eq("id", t.id);
-                                    loadTasks();
-                                  }} style={{ accentColor: "#1D9E75" }} />
-                                  <span style={{ textDecoration: item.done ? "line-through" : "none" }}>{item.text}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11, color: "#999" }}>
-                          {t.due_date && <span style={{ color: isOverdue ? "#E24B4A" : isSoon ? "#EF9F27" : "#999" }}>📅 {t.due_date}</span>}
-                          {t.assigned_to && <span>👤 {t.assigned_to}</span>}
-                          {t.projects?.name && <span>🏗 {t.projects.name}</span>}
-                          {t.contacts?.name && <span>👥 {t.contacts.name}</span>}
-                          <span>{typeLabels[t.type] || "Obecný"}</span>
-                        </div>
+                        {t.description && <div style={{ fontSize: 13, color: C.muted, marginBottom: 8 }}>{t.description}</div>}
+                        {checklist.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ height: 4, background: C.border, borderRadius: 2, marginBottom: 4 }}><div style={{ height: 4, width: `${checklist.length > 0 ? (doneItems/checklist.length)*100 : 0}%`, background: C.accent, borderRadius: 2 }} /></div><div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>{doneItems}/{checklist.length} splněno</div>{checklist.map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: item.done ? C.muted : C.text, marginBottom: 4 }}><input type="checkbox" checked={item.done} onChange={async () => { const nc = checklist.map((c, j) => j === i ? { ...c, done: !c.done } : c); await supabase.from("tasks").update({ checklist: nc }).eq("id", t.id); loadTasks(); }} style={{ accentColor: C.accent }} /><span style={{ textDecoration: item.done ? "line-through" : "none" }}>{item.text}</span></div>))}</div>}
+                        <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.muted, flexWrap: "wrap" }}>{t.due_date && <span style={{ color: isOverdue ? C.red : C.muted }}>📅 {t.due_date}</span>}{t.assigned_to && <span>👤 {t.assigned_to}</span>}{t.projects?.name && <span>🏗 {t.projects.name}</span>}{t.contacts?.name && <span>👥 {t.contacts.name}</span>}</div>
                       </div>
-
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <button onClick={() => { setTaskForm(t); setView("editTask"); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>✏️</button>
-                        <button onClick={() => deleteTask(t.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>×</button>
-                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><Btn onClick={() => { setTaskForm(t); setView("editTask"); }} variant="ghost" size="sm">✏️</Btn><Btn onClick={() => deleteTask(t.id)} variant="danger" size="sm">×</Btn></div>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
-              {tasks.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 40 }}>Žádné úkoly.</div>}
             </div>
           </>
         )}
 
         {/* EDIT ÚKOL */}
-        {!loading && view === "editTask" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <button onClick={() => { setView("tasks"); setTaskForm({}); }} style={{ background: "none", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 12 }}>← Úkoly</button>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>{taskForm.id ? "Upravit úkol" : "Nový úkol"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Název úkolu *</label>
-                <input type="text" value={taskForm.title || ""} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+        {view === "editTask" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}><button onClick={() => { setView("tasks"); setTaskForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Úkoly</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Úkol</h2></div>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Název *" span><TextInput value={taskForm.title} onChange={v => setTaskForm(f => ({ ...f, title: v }))} /></FormField>
+                <FormField label="Typ"><SelectInput value={taskForm.type} onChange={v => setTaskForm(f => ({ ...f, type: v }))} options={[["general","✅ Obecný"],["call","📞 Hovor"],["email","✉️ E-mail"],["meeting","🤝 Schůzka"],["document","📄 Dokument"],["price","💰 Cena"],["viewing","🏠 Prohlídka"],["contract","📝 Smlouva"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Stav"><SelectInput value={taskForm.status} onChange={v => setTaskForm(f => ({ ...f, status: v }))} options={[["todo","K řešení"],["inprogress","Probíhá"],["done","Hotovo"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Termín"><input type="date" value={taskForm.due_date || ""} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} style={inputStyle} /></FormField>
+                <FormField label="Priorita"><SelectInput value={taskForm.priority} onChange={v => setTaskForm(f => ({ ...f, priority: v }))} options={[["high","🔴 Vysoká"],["medium","🟡 Střední"],["low","🟢 Nízká"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Odpovědná osoba"><TextInput value={taskForm.assigned_to} onChange={v => setTaskForm(f => ({ ...f, assigned_to: v }))} /></FormField>
+                <FormField label="Projekt"><SelectInput value={taskForm.project_id} onChange={v => setTaskForm(f => ({ ...f, project_id: v || null }))} options={projects.map(p => [p.id, p.name])} placeholder="-- bez projektu --" /></FormField>
+                <FormField label="Kontakt"><SelectInput value={taskForm.contact_id} onChange={v => setTaskForm(f => ({ ...f, contact_id: v || null }))} options={contacts.map(c => [c.id, c.name])} placeholder="-- bez kontaktu --" /></FormField>
+                <FormField label="Popis" span><textarea value={taskForm.description || ""} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} style={{ ...inputStyle, height: 70, resize: "none" }} /></FormField>
+                <FormField label="Checklist" span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {(Array.isArray(taskForm.checklist) ? taskForm.checklist : []).map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}><input type="checkbox" checked={item.done} onChange={() => { const nc = taskForm.checklist.map((c, j) => j === i ? { ...c, done: !c.done } : c); setTaskForm(f => ({ ...f, checklist: nc })); }} style={{ accentColor: C.accent }} /><input type="text" value={item.text} onChange={e => { const nc = taskForm.checklist.map((c, j) => j === i ? { ...c, text: e.target.value } : c); setTaskForm(f => ({ ...f, checklist: nc })); }} style={{ ...inputStyle, flex: 1 }} /><button onClick={() => setTaskForm(f => ({ ...f, checklist: f.checklist.filter((_, j) => j !== i) }))} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 16 }}>×</button></div>))}
+                    <button onClick={() => setTaskForm(f => ({ ...f, checklist: [...(Array.isArray(f.checklist) ? f.checklist : []), { text: "", done: false }] }))} style={{ background: "#f0f0f0", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#555", alignSelf: "flex-start" }}>+ Přidat položku</button>
+                  </div>
+                </FormField>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Termín</label>
-                <input type="date" value={taskForm.due_date || ""} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Priorita</label>
-                <select value={taskForm.priority || "medium"} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="high">🔴 Vysoká</option>
-                  <option value="medium">🟡 Střední</option>
-                  <option value="low">🟢 Nízká</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Odpovědná osoba</label>
-                <input type="text" value={taskForm.assigned_to || ""} onChange={e => setTaskForm(f => ({ ...f, assigned_to: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Projekt</label>
-                <select value={taskForm.project_id || ""} onChange={e => setTaskForm(f => ({ ...f, project_id: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez projektu --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Kontakt</label>
-                <select value={taskForm.contact_id || ""} onChange={e => setTaskForm(f => ({ ...f, contact_id: e.target.value || null }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="">-- bez kontaktu --</option>
-                  {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Typ úkolu</label>
-                <select value={taskForm.type || "general"} onChange={e => setTaskForm(f => ({ ...f, type: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="general">✅ Obecný</option>
-                  <option value="call">📞 Hovor</option>
-                  <option value="email">✉️ E-mail</option>
-                  <option value="meeting">🤝 Schůzka</option>
-                  <option value="document">📄 Dokument</option>
-                  <option value="price">💰 Cena</option>
-                  <option value="viewing">🏠 Prohlídka</option>
-                  <option value="contract">📝 Smlouva</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
-                <select value={taskForm.status || "todo"} onChange={e => setTaskForm(f => ({ ...f, status: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
-                  <option value="todo">K řešení</option>
-                  <option value="inprogress">Probíhá</option>
-                  <option value="done">Hotovo</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Popis</label>
-                <textarea value={taskForm.description || ""} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }} />
-              </div>
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Checklist</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {(Array.isArray(taskForm.checklist) ? taskForm.checklist : []).map((item, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <input type="checkbox" checked={item.done} onChange={() => {
-                        const newChecklist = (taskForm.checklist || []).map((c, j) => j === i ? { ...c, done: !c.done } : c);
-                        setTaskForm(f => ({ ...f, checklist: newChecklist }));
-                      }} style={{ accentColor: "#1D9E75" }} />
-                      <input type="text" value={item.text} onChange={e => {
-                        const newChecklist = (taskForm.checklist || []).map((c, j) => j === i ? { ...c, text: e.target.value } : c);
-                        setTaskForm(f => ({ ...f, checklist: newChecklist }));
-                      }} style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa" }} />
-                      <button onClick={() => setTaskForm(f => ({ ...f, checklist: (f.checklist || []).filter((_, j) => j !== i) }))}
-                        style={{ background: "none", border: "none", color: "#E24B4A", cursor: "pointer", fontSize: 16 }}>×</button>
+            </Card>
+            <div style={{ display: "flex", gap: 10 }}><Btn onClick={saveTask} size="lg">Uložit</Btn>{taskForm.id && <Btn onClick={() => deleteTask(taskForm.id)} variant="danger" size="lg">Smazat</Btn>}<Btn onClick={() => { setView("tasks"); setTaskForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
+        )}
+
+        {/* DOKUMENTY */}
+        {view === "documents" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Dokumenty ({documents.length})</h2><Btn onClick={() => { setDocumentForm({}); setView("editDocument"); }}>+ Nahrát dokument</Btn></div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <input type="text" placeholder="Hledat..." value={documentSearch} onChange={e => setDocumentSearch(e.target.value)} style={{ ...inputStyle, flex: 1, borderRadius: 20 }} />
+              {["all","presentation","drawing","permit","contract","photo","other"].map(f => (<button key={f} onClick={() => setDocumentFilter(f)} style={{ padding: "5px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${C.border}`, background: documentFilter === f ? C.accent : "#fff", color: documentFilter === f ? "#fff" : C.muted }}>{ {"all":"Vše","presentation":"Prezentace","drawing":"Výkresy","permit":"Povolení","contract":"Smlouvy","photo":"Fotky","other":"Ostatní"}[f] }</button>))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+              {documents.filter(d => { if (documentFilter !== "all" && d.type !== documentFilter) return false; if (documentSearch && !d.name.toLowerCase().includes(documentSearch.toLowerCase())) return false; return true; }).map(d => { const isPdf = d.file_name?.toLowerCase().endsWith(".pdf"); const isImage = ["jpg","jpeg","png","webp"].some(ext => d.file_name?.toLowerCase().endsWith(ext)); return (
+                <Card key={d.id} style={{ padding: 0, overflow: "hidden" }}>
+                  {isImage ? <img src={d.url} alt={d.name} style={{ width: "100%", height: 120, objectFit: "cover" }} /> : <div style={{ height: 80, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>{isPdf ? "📄" : "📁"}</div>}
+                  <div style={{ padding: "12px 14px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>{d.name}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>{d.projects?.name && `🏗 ${d.projects.name}`}{d.contacts?.name && ` · 👤 ${d.contacts.name}`}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: d.is_public ? C.accentLight : "#f0f0f0", color: d.is_public ? "#0F6E56" : "#666" }}>{d.is_public ? "Veřejný" : "Interní"}</span>
+                      <div style={{ display: "flex", gap: 6 }}><a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.blue, textDecoration: "none" }}>👁</a><button onClick={() => { setDocumentForm(d); setView("editDocument"); }} style={{ background: "none", border: "none", fontSize: 12, color: C.muted, cursor: "pointer" }}>✏️</button><button onClick={() => deleteDocument(d.id)} style={{ background: "none", border: "none", fontSize: 12, color: C.red, cursor: "pointer" }}>×</button></div>
                     </div>
-                  ))}
-                  <button onClick={() => setTaskForm(f => ({ ...f, checklist: [...(Array.isArray(f.checklist) ? f.checklist : []), { text: "", done: false }] }))}
-                    style={{ background: "#f0f0f0", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#555", alignSelf: "flex-start" }}>
-                    + Přidat položku
-                  </button>
-                </div>
+                  </div>
+                </Card>
+              ); })}
+            </div>
+          </>
+        )}
+
+        {/* EDIT DOKUMENT */}
+        {view === "editDocument" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}><button onClick={() => { setView("documents"); setDocumentForm({}); }} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", padding: 0 }}>← Dokumenty</button><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Dokument</h2></div>
+            {!documentForm.id && <Card style={{ marginBottom: 16 }}><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", marginBottom: 10 }}>Soubor</div><input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const fileName = `docs/${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("documents").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName); setDocumentForm(f => ({ ...f, url: urlData.publicUrl, file_name: file.name, file_size: file.size, name: f.name || file.name })); } }} style={{ fontSize: 13 }} />{documentForm.url && <div style={{ fontSize: 12, color: C.accent, marginTop: 8 }}>✓ {documentForm.file_name}</div>}</Card>}
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <FormField label="Název *" span><TextInput value={documentForm.name} onChange={v => setDocumentForm(f => ({ ...f, name: v }))} /></FormField>
+                <FormField label="Typ"><SelectInput value={documentForm.type} onChange={v => setDocumentForm(f => ({ ...f, type: v }))} options={[["presentation","Prezentace"],["drawing","Výkres"],["permit","Stavební povolení"],["contract","Smlouva"],["reservation_contract","Rezervační smlouva"],["purchase_contract","Kupní smlouva"],["photo","Fotky"],["visualization","Vizualizace"],["price_list","Ceník"],["technical","Technická dok."],["other","Ostatní"]]} placeholder="-- vyberte --" /></FormField>
+                <FormField label="Projekt"><SelectInput value={documentForm.project_id} onChange={v => setDocumentForm(f => ({ ...f, project_id: v || null }))} options={projects.map(p => [p.id, p.name])} placeholder="-- bez projektu --" /></FormField>
+                <FormField label="Kontakt"><SelectInput value={documentForm.contact_id} onChange={v => setDocumentForm(f => ({ ...f, contact_id: v || null }))} options={contacts.map(c => [c.id, c.name])} placeholder="-- bez kontaktu --" /></FormField>
+                <div style={{ paddingTop: 20 }}><CheckboxField label="Veřejný dokument (viditelný zákazníkům)" checked={documentForm.is_public} onChange={v => setDocumentForm(f => ({ ...f, is_public: v }))} /></div>
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={saveTask} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Uložit</button>
-              {taskForm.id && <button onClick={() => deleteTask(taskForm.id)} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Smazat</button>}
-              <button onClick={() => { setView("tasks"); setTaskForm({}); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
-            </div>
-          </div>
+            </Card>
+            <div style={{ display: "flex", gap: 10 }}><Btn onClick={saveDocument} size="lg">Uložit</Btn><Btn onClick={() => { setView("documents"); setDocumentForm({}); }} variant="ghost" size="lg">Zrušit</Btn></div>
+          </>
         )}
 
         {/* AI ASISTENT */}
-        {!loading && view === "ai" && (
+        {view === "ai" && (
           <>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>🤖 AI Asistent</div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Vyberte projekt</label>
-              <select value={aiSelectedProject} onChange={e => { setAiSelectedProject(e.target.value); setAiResult(""); }}
-                style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", maxWidth: 400 }}>
-                <option value="">-- vyberte projekt --</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-
+            <div style={{ marginBottom: 24 }}><h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: C.text }}>🤖 AI Asistent</h2><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Analýzy a reporty generované umělou inteligencí</div></div>
+            <Card style={{ marginBottom: 20 }}><FormField label="Vyberte projekt"><SelectInput value={aiSelectedProject} onChange={v => { setAiSelectedProject(v); setAiResult(""); }} options={projects.map(p => [p.id, p.name])} placeholder="-- vyberte projekt --" /></FormField></Card>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 18 }}>
-                <div style={{ fontSize: 16, marginBottom: 8 }}>📊</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Investor report</div>
-                <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>AI vygeneruje profesionální shrnutí projektu pro investory včetně klíčových metrik.</div>
-                <button onClick={async () => {
-                  if (!aiSelectedProject) { alert("Vyberte projekt"); return; }
-                  const p = projects.find(pr => pr.id === aiSelectedProject);
-                  const avail = p.total_units - p.sold_units;
-                  const pct = p.total_units > 0 ? Math.round((p.sold_units / p.total_units) * 100) : 0;
-                  await callAI(`Jsi expert na realitní trh v ČR. Vygeneruj profesionální investor report pro projekt:
-
-Název: ${p.name}
-Lokalita: ${p.location}
-Adresa: ${p.address}
-Typ: ${p.type}
-Dokončení: ${p.completion}
-Celkem bytů: ${p.total_units}
-Prodáno: ${p.sold_units} (${pct}%)
-Volných: ${avail}
-Cena od: ${p.price_from?.toLocaleString("cs-CZ")} Kč
-Popis: ${p.description || ""}
-
-Report by měl obsahovat:
-1. Executive summary (2-3 věty)
-2. Klíčové parametry projektu
-3. Prodejní progress a výhled
-4. Silné stránky projektu
-5. Doporučení
-
-Piš v češtině, profesionálně, stručně.`);
-                }} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", width: "100%", fontWeight: 500 }}>
-                  Generovat report
-                </button>
-              </div>
-
-              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 18 }}>
-                <div style={{ fontSize: 16, marginBottom: 8 }}>🔍</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Kontrola dat</div>
-                <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>AI zkontroluje kompletnost dat projektu a bytů a upozorní na chybějící informace.</div>
-                <button onClick={async () => {
-                  if (!aiSelectedProject) { alert("Vyberte projekt"); return; }
-                  const p = projects.find(pr => pr.id === aiSelectedProject);
-                  const { data: unitData } = await supabase.from("units").select("*").eq("project_id", aiSelectedProject);
-                  const units = unitData || [];
-                  const missingProjectFields = [];
-                  if (!p.description) missingProjectFields.push("popis projektu");
-                  if (!p.address) missingProjectFields.push("adresa");
-                  if (!p.completion) missingProjectFields.push("datum dokončení");
-                  if (!p.lat || !p.lng) missingProjectFields.push("poloha na mapě");
-                  if (!p.company_logo) missingProjectFields.push("logo firmy");
-
-                  const unitIssues = units.map(u => {
-                    const issues = [];
-                    if (!u.price_net) issues.push("cena");
-                    if (!u.area) issues.push("plocha");
-                    if (!u.floor) issues.push("patro");
-                    if (!u.disp) issues.push("dispozice");
-                    if (!u.images || u.images.length === 0) issues.push("fotky");
-                    if (!u.floor_plan) issues.push("půdorys");
-                    return issues.length > 0 ? `Byt č.${u.unit_number}: chybí ${issues.join(", ")}` : null;
-                  }).filter(Boolean);
-
-                  await callAI(`Jsi QA expert na realitní CRM systémy. Zkontroluj data projektu a navrhni co zlepšit:
-
-PROJEKT: ${p.name}
-Chybějící pole projektu: ${missingProjectFields.length > 0 ? missingProjectFields.join(", ") : "vše vyplněno"}
-Počet bytů: ${units.length}
-Byty s problémy: ${unitIssues.length > 0 ? "\n" + unitIssues.slice(0, 10).join("\n") : "žádné problémy"}
-${unitIssues.length > 10 ? `... a ${unitIssues.length - 10} dalších` : ""}
-
-Prodejní progress: ${p.sold_units}/${p.total_units} prodáno
-
-Napiš stručnou zprávu o kvalitě dat a konkrétní doporučení co doplnit pro lepší prodejnost. Piš v češtině.`);
-                }} style={{ background: "#0F6E56", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", width: "100%", fontWeight: 500 }}>
-                  Zkontrolovat data
-                </button>
-              </div>
-
-              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 18 }}>
-                <div style={{ fontSize: 16, marginBottom: 8 }}>💰</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Doporučení ceny</div>
-                <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>AI analyzuje ceny projektu a porovná je s trhem v dané lokalitě.</div>
-                <button onClick={async () => {
-                  if (!aiSelectedProject) { alert("Vyberte projekt"); return; }
-                  const p = projects.find(pr => pr.id === aiSelectedProject);
-                  const { data: unitData } = await supabase.from("units").select("disp, area, price_net, price_per_sqm, status").eq("project_id", aiSelectedProject);
-                  const units = unitData || [];
-                  const avgPrice = units.filter(u => u.price_per_sqm).reduce((s, u, _, a) => s + u.price_per_sqm / a.length, 0);
-                  const byDisp = {};
-                  units.forEach(u => {
-                    if (!byDisp[u.disp]) byDisp[u.disp] = [];
-                    if (u.price_per_sqm) byDisp[u.disp].push(u.price_per_sqm);
-                  });
-
-                  await callAI(`Jsi expert na oceňování nemovitostí v ČR. Analyzuj ceny projektu a poskytni doporučení:
-
-PROJEKT: ${p.name}
-Lokalita: ${p.location}
-Typ: ${p.type}
-Dokončení: ${p.completion}
-
-AKTUÁLNÍ CENY:
-Průměrná cena/m²: ${Math.round(avgPrice).toLocaleString("cs-CZ")} Kč
-${Object.entries(byDisp).map(([disp, prices]) => `${disp}: průměr ${Math.round(prices.reduce((a, b) => a + b, 0) / prices.length).toLocaleString("cs-CZ")} Kč/m²`).join("\n")}
-
-Na základě aktuálního trhu v lokalitě ${p.location} v roce 2025-2026:
-1. Zhodnoť zda jsou ceny přiměřené trhu
-2. Doporuč optimální cenové rozmezí pro každou dispozici
-3. Navrhni cenovou strategii pro zbývající byty
-4. Upozorni na příležitosti nebo rizika
-
-Piš konkrétně s čísly, v češtině.`);
-                }} style={{ background: "#7A4A0A", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", width: "100%", fontWeight: 500 }}>
-                  Analyzovat ceny
-                </button>
-              </div>
+              {[
+                { icon: "📊", title: "Investor report", color: C.blue, fn: async () => { if (!aiSelectedProject) { alert("Vyberte projekt"); return; } const p = projects.find(pr => pr.id === aiSelectedProject); const pct = p.total_units > 0 ? Math.round((p.sold_units/p.total_units)*100) : 0; await callAI(`Vygeneruj profesionální investor report pro projekt:\n\nNázev: ${p.name}\nLokalita: ${p.location}\nTyp: ${p.type}\nDokončení: ${p.completion}\nCelkem bytů: ${p.total_units}\nProdáno: ${p.sold_units} (${pct}%)\nCena od: ${p.price_from?.toLocaleString("cs-CZ")} Kč\n\nReport obsahuje: 1) Executive summary, 2) Klíčové parametry, 3) Prodejní progress, 4) Silné stránky, 5) Doporučení. Piš česky.`); } },
+                { icon: "🔍", title: "Kontrola dat", color: C.accent, fn: async () => { if (!aiSelectedProject) { alert("Vyberte projekt"); return; } const p = projects.find(pr => pr.id === aiSelectedProject); const { data: unitData } = await supabase.from("units").select("*").eq("project_id", aiSelectedProject); const units = unitData || []; const mp = []; if (!p.description) mp.push("popis"); if (!p.address) mp.push("adresa"); if (!p.lat) mp.push("poloha"); const ui = units.map(u => { const iss = []; if (!u.price_net) iss.push("cena"); if (!u.area) iss.push("plocha"); if (!u.images || u.images.length === 0) iss.push("fotky"); if (!u.floor_plan) iss.push("půdorys"); return iss.length > 0 ? `Byt č.${u.unit_number}: chybí ${iss.join(", ")}` : null; }).filter(Boolean); await callAI(`Zkontroluj data projektu:\n\nPROJEKT: ${p.name}\nChybí: ${mp.length > 0 ? mp.join(", ") : "vše ok"}\nBytů: ${units.length}\nByty s problémy:\n${ui.slice(0,10).join("\n")}\n\nNapiš doporučení. Piš česky.`); } },
+                { icon: "💰", title: "Doporučení ceny", color: "#7A4A0A", fn: async () => { if (!aiSelectedProject) { alert("Vyberte projekt"); return; } const p = projects.find(pr => pr.id === aiSelectedProject); const { data: unitData } = await supabase.from("units").select("disp, price_per_sqm").eq("project_id", aiSelectedProject); const units = unitData || []; const avgPrice = units.filter(u => u.price_per_sqm).reduce((s, u, _, a) => s + u.price_per_sqm / a.length, 0); await callAI(`Analyzuj ceny projektu:\n\nPROJEKT: ${p.name}\nLokalita: ${p.location}\nPrůměr/m²: ${Math.round(avgPrice).toLocaleString("cs-CZ")} Kč\n\n1) Zhodnoť vs trh, 2) Doporuč ceny, 3) Navrhni strategii. Piš česky s čísly.`); } },
+              ].map(item => (
+                <Card key={item.title} style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>{item.icon}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6, flex: 1 }}>{item.title}</div>
+                  <button onClick={item.fn} style={{ background: item.color, color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>Generovat</button>
+                </Card>
+              ))}
             </div>
-
-            {(aiLoading || aiResult) && (
-              <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 20 }}>
-                {aiLoading ? (
-                  <div style={{ textAlign: "center", color: "#aaa", padding: 20 }}>
-                    <div style={{ fontSize: 24, marginBottom: 8 }}>🤖</div>
-                    <div>AI analyzuje data...</div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Výsledek analýzy</div>
-                      <button onClick={() => navigator.clipboard.writeText(aiResult)} style={{ background: "#f0f0f0", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 12, cursor: "pointer" }}>
-                        📋 Kopírovat
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 13, color: "#333", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{aiResult}</div>
-                  </>
-                )}
-              </div>
-            )}
+            {(aiLoading || aiResult) && (<Card>{aiLoading ? (<div style={{ textAlign: "center", color: C.muted, padding: 30 }}><div style={{ fontSize: 32, marginBottom: 10 }}>🤖</div><div>AI analyzuje data...</div></div>) : (<><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}><div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Výsledek</div><button onClick={() => navigator.clipboard.writeText(aiResult)} style={{ background: "#f0f0f0", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 12, cursor: "pointer" }}>📋 Kopírovat</button></div><div style={{ fontSize: 13, color: C.text, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{aiResult}</div></>)}</Card>)}
           </>
         )}
 
         {/* NASTAVENÍ */}
-        {!loading && view === "settings" && (
-          <div style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: 24 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 20 }}>Nastavení webu</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                ["hero_label", "Malý text nahoře"],
-                ["hero_title", "Hlavní nadpis"],
-                ["hero_subtitle", "Podnadpis"],
-                ["company_name", "Název firmy"],
-                ["phone", "Telefon"],
-                ["agent_name", "Jméno makléře"],
-                ["agent_phone", "Telefon makléře"],
-                ["agent_email", "Email makléře"],
-              ].map(([key, label]) => (
-                <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
-                  <input type="text" value={settings[key] || ""} onChange={e => setSettings(s => ({ ...s, [key]: e.target.value }))}
-                    style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+        {view === "settings" && (
+          <>
+            <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 700, color: C.text }}>Nastavení webu</h2>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", marginBottom: 14 }}>Texty na hlavní stránce</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[["hero_label","Malý text nahoře"],["hero_title","Hlavní nadpis"],["hero_subtitle","Podnadpis"],["company_name","Název firmy"],["phone","Telefon"]].map(([key, label]) => (<FormField key={key} label={label}><TextInput value={settings[key]} onChange={v => setSettings(s => ({ ...s, [key]: v }))} /></FormField>))}
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <FormField label="Logo firmy">
+                  <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const fileName = `settings/logo-${Date.now()}-${file.name}`; const { error } = await supabase.storage.from("project-images").upload(fileName, file); if (!error) { const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName); setSettings(s => ({ ...s, company_logo: urlData.publicUrl })); } }} style={{ fontSize: 13 }} />
+                  {settings.company_logo && <img src={settings.company_logo} alt="Logo" style={{ height: 50, objectFit: "contain", marginTop: 10 }} />}
+                </FormField>
+              </div>
+            </Card>
+            <Btn size="lg" onClick={async () => { setSettingsLoading(true); for (const [key, value] of Object.entries(settings)) { await supabase.from("settings").upsert({ key, value }); } setSettingsLoading(false); alert("Uloženo!"); }}>{settingsLoading ? "Ukládám..." : "Uložit nastavení"}</Btn>
+          </>
+        )}
+
+        {/* UŽIVATELÉ */}
+        {view === "users" && currentUser?.role === "admin" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>Uživatelé ({adminUsers.length})</h2><Btn onClick={() => setUserForm({ role: "agent" })}>+ Nový uživatel</Btn></div>
+            {userForm.role !== undefined && (<Card style={{ marginBottom: 16 }}><div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 14 }}>{userForm.id ? "Upravit" : "Nový uživatel"}</div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><FormField label="Celé jméno"><TextInput value={userForm.full_name} onChange={v => setUserForm(f => ({ ...f, full_name: v }))} /></FormField><FormField label="Uživatelské jméno *"><TextInput value={userForm.username} onChange={v => setUserForm(f => ({ ...f, username: v }))} /></FormField><FormField label={`Heslo ${userForm.id ? "(prázdné = beze změny)" : "*"}`}><input type="password" value={userForm.password || ""} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))} style={inputStyle} /></FormField><FormField label="E-mail"><TextInput value={userForm.email} onChange={v => setUserForm(f => ({ ...f, email: v }))} type="email" /></FormField><FormField label="Role"><SelectInput value={userForm.role} onChange={v => setUserForm(f => ({ ...f, role: v }))} options={[["admin","Admin — plný přístup"],["agent","Makléř — omezený přístup"]]} placeholder="-- vyberte --" /></FormField></div><div style={{ display: "flex", gap: 10, marginTop: 16 }}><Btn onClick={saveAdminUser}>Uložit</Btn><Btn onClick={() => setUserForm({})} variant="ghost">Zrušit</Btn></div></Card>)}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {adminUsers.map(u => (<Card key={u.id} style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}><div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{u.full_name || u.username}</div><Badge bg={u.role === "admin" ? C.blueLight : C.accentLight} color={u.role === "admin" ? C.blue : "#0F6E56"}>{u.role === "admin" ? "Admin" : "Makléř"}</Badge>{u.id === currentUser?.id && <span style={{ fontSize: 11, color: C.muted }}>(vy)</span>}</div><div style={{ fontSize: 12, color: C.muted }}>@{u.username}{u.email && ` · ${u.email}`}</div></div><div style={{ display: "flex", gap: 8 }}><Btn onClick={() => setUserForm(u)} variant="ghost" size="sm">Upravit</Btn>{u.id !== currentUser?.id && <Btn onClick={() => deleteAdminUser(u.id)} variant="danger" size="sm">Smazat</Btn>}</div></Card>))}
+            </div>
+          </>
+        )}
+
+        {/* PDF EDITOR */}
+        {pdfEditor && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "#fff", borderRadius: 16, width: "95vw", maxWidth: 1100, maxHeight: "95vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Upravit PDF nabídku</div><button onClick={() => setPdfEditor(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.muted }}>×</button></div>
+              <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+                  {[["name","Název projektu","project"],["address","Adresa","project"],["unit_number","Číslo bytu","unit"],["disp","Dispozice","unit"],["area","Plocha (m²)","unit"],["floor","Patro","unit"],["price_net","Cena bez DPH","unit"],["agent_name","Jméno makléře","unit"],["agent_phone","Telefon makléře","unit"]].map(([field, label, obj]) => (<FormField key={field} label={label}><input type="text" value={pdfEditor[obj][field] || ""} onChange={e => setPdfEditor(prev => ({ ...prev, [obj]: { ...prev[obj], [field]: e.target.value } }))} style={inputStyle} /></FormField>))}
                 </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Logo firmy</label>
-              <input type="file" accept="image/*" onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const fileName = `settings/logo-${Date.now()}-${file.name}`;
-                const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                if (!error) {
-                  const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                  setSettings(s => ({ ...s, company_logo: urlData.publicUrl }));
-                }
-              }} style={{ fontSize: 13 }} />
-              {settings.company_logo && <img src={settings.company_logo} alt="Logo" style={{ height: 50, objectFit: "contain", marginTop: 4 }} />}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Fotka makléře</label>
-              <input type="file" accept="image/*" onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const fileName = `settings/agent-${Date.now()}-${file.name}`;
-                const { error } = await supabase.storage.from("project-images").upload(fileName, file);
-                if (!error) {
-                  const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(fileName);
-                  setSettings(s => ({ ...s, agent_photo: urlData.publicUrl }));
-                }
-              }} style={{ fontSize: 13 }} />
-              {settings.agent_photo && <img src={settings.agent_photo} alt="Makler" style={{ height: 80, width: 80, objectFit: "cover", borderRadius: "50%", marginTop: 4 }} />}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={async () => {
-                setSettingsLoading(true);
-                for (const [key, value] of Object.entries(settings)) {
-                  await supabase.from("settings").upsert({ key, value });
-                }
-                setSettingsLoading(false);
-                alert("Nastavení uloženo!");
-              }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                {settingsLoading ? "Ukládám..." : "Uložit nastavení"}
-              </button>
-              <button onClick={() => setView("projects")} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>Zrušit</button>
+                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Design PDF</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>Šablona</div><div style={{ display: "flex", gap: 8 }}>{[["minimal","Minimalistická"],["premium","Prémiová"],["color","Barevná"]].map(([v, l]) => (<button key={v} onClick={() => setPdfEditor(prev => ({ ...prev, template: v }))} style={{ flex: 1, padding: "10px", borderRadius: 10, fontSize: 13, cursor: "pointer", border: `1px solid ${C.border}`, background: pdfEditor.template === v ? C.accent : "#fff", color: pdfEditor.template === v ? "#fff" : C.text }}>{l}</button>))}</div></div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>{[["colorHeader","Barva hlavičky"],["colorPrice","Barva ceny"],["colorAccent","Barva akcentu"]].map(([field, label]) => (<FormField key={field} label={label}><input type="color" value={pdfEditor[field]} onChange={e => setPdfEditor(prev => ({ ...prev, [field]: e.target.value }))} style={{ width: "100%", height: 40, borderRadius: 8, border: `1px solid ${C.border}`, cursor: "pointer" }} /></FormField>))}</div>
+                    <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>Poloha fotek</div><div style={{ display: "flex", gap: 8 }}>{[["top","Nahoře"],["bottom","Dole"],["none","Skrýt"]].map(([v, l]) => (<button key={v} onClick={() => setPdfEditor(prev => ({ ...prev, photosPosition: v }))} style={{ flex: 1, padding: "8px", borderRadius: 9, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: pdfEditor.photosPosition === v ? C.accent : "#fff", color: pdfEditor.photosPosition === v ? "#fff" : C.text }}>{l}</button>))}</div></div>
+                    <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>Poloha makléře</div><div style={{ display: "flex", gap: 8 }}>{[["bottom","Dole"],["right","Vpravo"],["none","Skrýt"]].map(([v, l]) => (<button key={v} onClick={() => setPdfEditor(prev => ({ ...prev, agentPosition: v }))} style={{ flex: 1, padding: "8px", borderRadius: 9, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: pdfEditor.agentPosition === v ? C.accent : "#fff", color: pdfEditor.agentPosition === v ? "#fff" : C.text }}>{l}</button>))}</div></div>
+                    <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>Velikost fotky makléře</div><input type="range" min="50" max="200" value={pdfEditor.agentPhotoSize} onChange={e => setPdfEditor(prev => ({ ...prev, agentPhotoSize: parseInt(e.target.value) }))} style={{ width: "100%", accentColor: C.accent }} /><div style={{ fontSize: 11, color: C.muted, textAlign: "center" }}>{pdfEditor.agentPhotoSize} px</div></div>
+                    <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>Tvar fotky makléře</div><div style={{ display: "flex", gap: 8 }}>{[["circle","Kulatá"],["square","Čtvercová"],["rounded","Zaoblená"]].map(([v, l]) => (<button key={v} onClick={() => setPdfEditor(prev => ({ ...prev, agentPhotoShape: v }))} style={{ flex: 1, padding: "8px", borderRadius: 9, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: pdfEditor.agentPhotoShape === v ? C.accent : "#fff", color: pdfEditor.agentPhotoShape === v ? "#fff" : C.text }}>{l}</button>))}</div></div>
+                    <div><div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>Velikost ceny</div><div style={{ display: "flex", gap: 8 }}>{[["large","Velká"],["small","Malá"]].map(([v, l]) => (<button key={v} onClick={() => setPdfEditor(prev => ({ ...prev, priceSize: v }))} style={{ flex: 1, padding: "8px", borderRadius: 9, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: pdfEditor.priceSize === v ? C.accent : "#fff", color: pdfEditor.priceSize === v ? "#fff" : C.text }}>{l}</button>))}</div></div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 10 }}>
+                <Btn onClick={async () => { const { previewUnitPDF } = await import("./UnitPDF"); const url = await previewUnitPDF(pdfEditor.project, pdfEditor.unit, { agentPhotoSize: pdfEditor.agentPhotoSize, agentPhotoShape: pdfEditor.agentPhotoShape, template: pdfEditor.template, colorHeader: pdfEditor.colorHeader, colorPrice: pdfEditor.colorPrice, colorAccent: pdfEditor.colorAccent, photosPosition: pdfEditor.photosPosition, agentPosition: pdfEditor.agentPosition, priceSize: pdfEditor.priceSize }); setPdfPreview(url); }} style={{ flex: 1 }}>Zobrazit náhled</Btn>
+                <Btn onClick={() => setPdfEditor(null)} variant="ghost">Zrušit</Btn>
+              </div>
             </div>
           </div>
         )}
 
-      {pdfEditor && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 12, width: "95vw", maxWidth: 1100, maxHeight: "95vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>Upravit PDF nabídku</div>
-              <button onClick={() => setPdfEditor(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#999" }}>×</button>
-            </div>
-            <div style={{ padding: "18px", overflow: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {[
-                ["Název projektu", "name", "project"],
-                ["Adresa", "address", "project"],
-                ["Číslo bytu", "unit_number", "unit"],
-                ["Dispozice", "disp", "unit"],
-                ["Plocha (m²)", "area", "unit"],
-                ["Patro", "floor", "unit"],
-                ["Cena bez DPH", "price_net", "unit"],
-                ["Cena za m²", "price_per_sqm", "unit"],
-                ["Jméno makléře", "agent_name", "unit"],
-                ["Telefon makléře", "agent_phone", "unit"],
-              ].map(([label, field, obj]) => (
-                <div key={field} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>{label}</label>
-                  <input type="text" value={pdfEditor[obj][field] || ""}
-                    onChange={e => setPdfEditor(prev => ({
-                      ...prev,
-                      [obj]: { ...prev[obj], [field]: e.target.value }
-                    }))}
-                    style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}
-                  />
-                </div>
-              ))}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Poznámka pro klienta</label>
-                <textarea value={pdfEditor.unit.pdf_note || ""}
-                  onChange={e => setPdfEditor(prev => ({ ...prev, unit: { ...prev.unit, pdf_note: e.target.value } }))}
-                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, height: 80, resize: "none", background: "#fafafa", color: "#1a1a1a" }}
-                  placeholder="Volitelná poznámka která se zobrazí v PDF..."
-                />
-              </div>
-            </div>
-            <div style={{ padding: "0 18px 12px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ borderTop: "0.5px solid #eee", paddingTop: 14, marginTop: 4 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 12 }}>Design PDF</div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Šablona</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[["minimal", "Minimalistická"], ["premium", "Prémiová"], ["color", "Barevná"]].map(([val, lbl]) => (
-                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, template: val }))}
-                          style={{ flex: 1, padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
-                            background: pdfEditor.template === val ? "#1D9E75" : "#f0f0f0",
-                            color: pdfEditor.template === val ? "#fff" : "#333" }}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                    <div>
-                      <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>Barva hlavičky</label>
-                      <input type="color" value={pdfEditor.colorHeader}
-                        onChange={e => setPdfEditor(prev => ({ ...prev, colorHeader: e.target.value }))}
-                        style={{ width: "100%", height: 36, borderRadius: 8, border: "0.5px solid #ddd", cursor: "pointer" }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>Barva ceny</label>
-                      <input type="color" value={pdfEditor.colorPrice}
-                        onChange={e => setPdfEditor(prev => ({ ...prev, colorPrice: e.target.value }))}
-                        style={{ width: "100%", height: 36, borderRadius: 8, border: "0.5px solid #ddd", cursor: "pointer" }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>Barva akcentu</label>
-                      <input type="color" value={pdfEditor.colorAccent}
-                        onChange={e => setPdfEditor(prev => ({ ...prev, colorAccent: e.target.value }))}
-                        style={{ width: "100%", height: 36, borderRadius: 8, border: "0.5px solid #ddd", cursor: "pointer" }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Poloha fotek</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[["top", "Nahoře"], ["bottom", "Dole"], ["none", "Skrýt"]].map(([val, lbl]) => (
-                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, photosPosition: val }))}
-                          style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
-                            background: pdfEditor.photosPosition === val ? "#1D9E75" : "#f0f0f0",
-                            color: pdfEditor.photosPosition === val ? "#fff" : "#333" }}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Poloha makléře</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[["bottom", "Dole"], ["right", "Vpravo"], ["none", "Skrýt"]].map(([val, lbl]) => (
-                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, agentPosition: val }))}
-                          style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
-                            background: pdfEditor.agentPosition === val ? "#1D9E75" : "#f0f0f0",
-                            color: pdfEditor.agentPosition === val ? "#fff" : "#333" }}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 6 }}>Velikost ceny</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[["large", "Velká"], ["small", "Malá"]].map(([val, lbl]) => (
-                        <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, priceSize: val }))}
-                          style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: "none",
-                            background: pdfEditor.priceSize === val ? "#1D9E75" : "#f0f0f0",
-                            color: pdfEditor.priceSize === val ? "#fff" : "#333" }}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Velikost fotky makléře</label>
-                <input type="range" min="50" max="200" value={pdfEditor.agentPhotoSize}
-                  onChange={e => setPdfEditor(prev => ({ ...prev, agentPhotoSize: parseInt(e.target.value) }))}
-                  style={{ width: "100%" }} />
-                <div style={{ fontSize: 11, color: "#999", textAlign: "center" }}>{pdfEditor.agentPhotoSize} px</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Tvar fotky makléře</label>
+        {/* PDF PREVIEW */}
+        {pdfPreview && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "#fff", borderRadius: 16, width: "80vw", height: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Náhled PDF</div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {[["circle", "Kulatá"], ["square", "Čtvercová"], ["rounded", "Zaoblená"]].map(([val, lbl]) => (
-                    <button key={val} onClick={() => setPdfEditor(prev => ({ ...prev, agentPhotoShape: val }))}
-                      style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                        background: pdfEditor.agentPhotoShape === val ? "#1D9E75" : "#f0f0f0",
-                        color: pdfEditor.agentPhotoShape === val ? "#fff" : "#333",
-                        border: "none" }}>
-                      {lbl}
-                    </button>
-                  ))}
+                  <button onClick={() => setPdfPreview(null)} style={{ background: "none", border: "none", color: C.accent, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>← Upravit</button>
+                  <a href={pdfPreview} download="nabidka.pdf" style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>Stáhnout</a>
+                  <button onClick={() => { setPdfPreview(null); setPdfEditor(null); }} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, cursor: "pointer" }}>Zavřít</button>
                 </div>
               </div>
-            </div>
-            <div style={{ padding: "12px 18px", borderTop: "0.5px solid #eee", display: "flex", gap: 8 }}>
-              <button onClick={async () => {
-                const { previewUnitPDF } = await import("./UnitPDF");
-                const url = await previewUnitPDF(pdfEditor.project, pdfEditor.unit, {
-                  agentPhotoSize: pdfEditor.agentPhotoSize,
-                  agentPhotoShape: pdfEditor.agentPhotoShape,
-                  template: pdfEditor.template,
-                  colorHeader: pdfEditor.colorHeader,
-                  colorPrice: pdfEditor.colorPrice,
-                  colorAccent: pdfEditor.colorAccent,
-                  photosPosition: pdfEditor.photosPosition,
-                  agentPosition: pdfEditor.agentPosition,
-                  priceSize: pdfEditor.priceSize,
-                });
-                setPdfPreview(url);
-              }} style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", flex: 1 }}>
-                Zobrazit náhled
-              </button>
-              <button onClick={() => setPdfEditor(null)} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, cursor: "pointer" }}>
-                Zrušit
-              </button>
+              <iframe src={pdfPreview} style={{ flex: 1, border: "none" }} title="PDF náhled" />
             </div>
           </div>
-        </div>
-      )}
-
-      {pdfPreview && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 12, width: "80vw", height: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: "0.5px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>Náhled PDF</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setPdfPreview(null)} style={{ background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, cursor: "pointer" }}>
-                  ← Upravit
-                </button>
-                <a href={pdfPreview} download="nabidka.pdf" style={{ background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
-                  Stáhnout
-                </a>
-                <button onClick={() => { setPdfPreview(null); setPdfEditor(null); }} style={{ background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, cursor: "pointer" }}>
-                  Zavřít
-                </button>
-              </div>
-            </div>
-            <iframe src={pdfPreview} style={{ flex: 1, border: "none" }} title="PDF náhled" />
-          </div>
-        </div>
-      )}
+        )}
 
       </div>
     </div>
