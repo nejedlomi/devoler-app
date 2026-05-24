@@ -139,7 +139,7 @@ function ImageGallery({ images }) {
   );
 }
 
-function ProjectDetail({ project, onBack, onReserve }) {
+function ProjectDetail({ project, onBack, onReserve, setLightbox }) {
   const [units, setUnits] = useState([]);
   const [floor, setFloor] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
@@ -231,9 +231,16 @@ function ProjectDetail({ project, onBack, onReserve }) {
               <>
                 <div style={{ background: "#F4F7FC", borderRadius: 10, padding: 14 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: "#0D2137" }}>Byt č. {selectedUnit.unit_number} · {selectedUnit.disp}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "#1A3A6B", marginTop: 6 }}>{fmt(selectedUnit.price)}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#1A3A6B", marginTop: 6 }}>{fmt(selectedUnit.price_net || selectedUnit.price)}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 12 }}>
-                    {[["Plocha", `${selectedUnit.area} m²`], ["Patro", `${selectedUnit.floor}. patro`], ["Balkon", selectedUnit.balcony ? "Ano" : "Ne"], ["Parkoviště", selectedUnit.parking ? "V ceně" : "Ne"]].map(([l, v]) => (
+                    {[
+                      ["Plocha", `${selectedUnit.area} m²`],
+                      ["Patro", `${selectedUnit.floor}. patro`],
+                      ["Balkon", selectedUnit.balcony ? "Ano" : "Ne"],
+                      ["Parkoviště", selectedUnit.parking ? "V ceně" : "Ne"],
+                      ["Orientace", selectedUnit.orientation || "—"],
+                      ["Sklep", selectedUnit.cellar ? "Ano" : "Ne"],
+                    ].map(([l, v]) => (
                       <div key={l} style={{ background: "#fff", borderRadius: 8, padding: "8px 10px" }}>
                         <div style={{ fontSize: 10, color: "#8899AA" }}>{l}</div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#0D2137" }}>{v}</div>
@@ -241,6 +248,20 @@ function ProjectDetail({ project, onBack, onReserve }) {
                     ))}
                   </div>
                 </div>
+                {(() => {
+                  const imgs = Array.isArray(selectedUnit.images) ? selectedUnit.images : [];
+                  return imgs.length > 0 ? (
+                    <div>
+                      <div style={{ fontSize: 12, color: "#8899AA", marginBottom: 6 }}>Fotky bytu</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {imgs.map((url, i) => (
+                          <img key={i} src={url} alt="" onClick={() => setLightbox({ images: imgs, index: i })}
+                            style={{ width: 80, height: 56, objectFit: "cover", borderRadius: 6, cursor: "zoom-in" }} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
                 {selectedUnit.status === "available" && (
                   <button onClick={() => onReserve(project, selectedUnit)} style={{ background: "#1A3A6B", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                     Rezervovat byt
@@ -377,6 +398,7 @@ function ReservationForm({ project, unit, onBack, onSuccess }) {
 }
 
 export default function App() {
+  const [lightbox, setLightbox] = useState(null);
   const [view, setView] = useState("list");
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -447,11 +469,45 @@ export default function App() {
       )}
 
       {view === "detail" && selectedProject && (
-        <ProjectDetail project={selectedProject} onBack={() => { setView("list"); setSelectedProject(null); }} onReserve={(proj, unit) => { setReservationUnit(unit); setView("reservation"); }} />
+        <ProjectDetail project={selectedProject} onBack={() => { setView("list"); setSelectedProject(null); }} onReserve={(proj, unit) => { setReservationUnit(unit); setView("reservation"); }} setLightbox={setLightbox} />
       )}
 
       {view === "reservation" && selectedProject && reservationUnit && (
         <ReservationForm project={selectedProject} unit={reservationUnit} onBack={() => setView("detail")} onSuccess={() => { setView("list"); setSelectedProject(null); setReservationUnit(null); }} />
+      )}
+
+      {lightbox && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div onClick={() => setLightbox(null)} style={{ position: "absolute", inset: 0 }} />
+          <button onClick={() => {
+            const imgs = lightbox.images;
+            const idx = (lightbox.index - 1 + imgs.length) % imgs.length;
+            setLightbox({ images: imgs, index: idx });
+          }} style={{
+            position: "absolute", left: 20, background: "rgba(255,255,255,0.2)", border: "none",
+            borderRadius: "50%", width: 48, height: 48, color: "#fff", fontSize: 24, cursor: "pointer", zIndex: 1
+          }}>‹</button>
+          <img src={lightbox.images[lightbox.index]} alt="" style={{ maxWidth: "85vw", maxHeight: "85vh", borderRadius: 12, objectFit: "contain", position: "relative", zIndex: 1 }} />
+          <button onClick={() => {
+            const imgs = lightbox.images;
+            const idx = (lightbox.index + 1) % imgs.length;
+            setLightbox({ images: imgs, index: idx });
+          }} style={{
+            position: "absolute", right: 20, background: "rgba(255,255,255,0.2)", border: "none",
+            borderRadius: "50%", width: 48, height: 48, color: "#fff", fontSize: 24, cursor: "pointer", zIndex: 1
+          }}>›</button>
+          <button onClick={() => setLightbox(null)} style={{
+            position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.2)",
+            border: "none", borderRadius: "50%", width: 40, height: 40, color: "#fff",
+            fontSize: 20, cursor: "pointer", zIndex: 2
+          }}>×</button>
+          <div style={{ position: "absolute", bottom: 16, color: "rgba(255,255,255,0.6)", fontSize: 13, zIndex: 1 }}>
+            {lightbox.index + 1} / {lightbox.images.length}
+          </div>
+        </div>
       )}
     </div>
   );
