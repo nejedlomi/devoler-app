@@ -324,10 +324,6 @@ export default function Admin() {
 
             {(() => {
               const today = new Date();
-              const delayed = projects.filter(p => {
-                const proj_milestones = [];
-                return false;
-              });
               const warnings = [];
               if (warnings.length === 0) {
                 const delayedProjects = projects.filter(p => p.completion && new Date(p.completion.replace("Q1", "03-31").replace("Q2", "06-30").replace("Q3", "09-30").replace("Q4", "12-31")) < today);
