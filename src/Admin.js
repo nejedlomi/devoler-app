@@ -898,19 +898,25 @@ export default function Admin() {
                       const isDelayed = m.status !== "done" && new Date(m.date_to) < today;
 
                       return (
-                        <div key={m.id} style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 10 }}>
-                          <div style={{ width: 160, fontSize: 11, color: "#333", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
-                          <div style={{ flex: 1, height: 24, background: "#f4f4f4", borderRadius: 4, position: "relative" }}>
-                            <div style={{
-                              position: "absolute", left: `${left}%`, width: `${width}%`,
-                              height: "100%", background: isDelayed ? "#E24B4A" : color,
-                              borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 6,
-                              minWidth: 4,
-                            }}>
-                              {width > 8 && <span style={{ fontSize: 9, color: "#fff", whiteSpace: "nowrap" }}>{m.date_from} – {m.date_to}</span>}
+                        <div key={m.id}>
+                          <div style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 10 }}>
+                            <div style={{ width: 160, fontSize: 11, color: "#333", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+                            <div style={{ flex: 1, height: 24, background: "#f4f4f4", borderRadius: 4, position: "relative" }}>
+                              <div style={{
+                                position: "absolute", left: `${left}%`, width: `${width}%`,
+                                height: "100%", background: isDelayed ? "#E24B4A" : color,
+                                borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 6,
+                                minWidth: 4,
+                              }}>
+                                {width > 8 && <span style={{ fontSize: 9, color: "#fff", whiteSpace: "nowrap" }}>{m.date_from} – {m.date_to}</span>}
+                              </div>
                             </div>
+                            <div style={{ width: 80, fontSize: 10, color: "#888", flexShrink: 0 }}>{statusLabels[m.status] || m.status}</div>
                           </div>
-                          <div style={{ width: 80, fontSize: 10, color: "#888", flexShrink: 0 }}>{statusLabels[m.status] || m.status}</div>
+                          {m.depends_on && (() => {
+                            const dep = milestones.find(d => d.id === m.depends_on);
+                            return dep ? <div style={{ fontSize: 10, color: "#999", marginLeft: 170, marginTop: -4, marginBottom: 2 }}>↳ závisí na: <strong>{dep.name}</strong></div> : null;
+                          })()}
                         </div>
                       );
                     })}
@@ -939,6 +945,12 @@ export default function Admin() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{m.name}</div>
                         {isDelayed && <span style={{ fontSize: 10, background: "#FCEBEB", color: "#A32D2D", padding: "2px 8px", borderRadius: 20 }}>Zpožděno</span>}
+                        {m.depends_on && (() => {
+                          const dep = milestones.find(d => d.id === m.depends_on);
+                          return dep && dep.status !== "done" ? (
+                            <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>⚠️ Čeká na: {dep.name}</span>
+                          ) : null;
+                        })()}
                         {isSoon && !isDelayed && <span style={{ fontSize: 10, background: "#FAEEDA", color: "#633806", padding: "2px 8px", borderRadius: 20 }}>Blíží se</span>}
                       </div>
                       <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>
@@ -992,6 +1004,16 @@ export default function Admin() {
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Odpovědná osoba</label>
                 <input type="text" value={milestoneForm.responsible || ""} onChange={e => setMilestoneForm(f => ({ ...f, responsible: e.target.value }))}
                   style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Závisí na milníku</label>
+                <select value={milestoneForm.depends_on || ""} onChange={e => setMilestoneForm(f => ({ ...f, depends_on: e.target.value || null }))}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "0.5px solid #ddd", fontSize: 13, background: "#fafafa", color: "#1a1a1a" }}>
+                  <option value="">-- bez závislosti --</option>
+                  {milestones.filter(m => m.id !== milestoneForm.id).map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Stav</label>
