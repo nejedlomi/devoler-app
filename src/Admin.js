@@ -377,6 +377,12 @@ export default function Admin() {
                 const delayedProjects = projects.filter(p => p.completion && new Date(p.completion.replace("Q1", "03-31").replace("Q2", "06-30").replace("Q3", "09-30").replace("Q4", "12-31")) < today);
                 delayedProjects.forEach(p => warnings.push({ type: "delayed", text: `Projekt ${p.name} má termín dokončení v minulosti` }));
               }
+              reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).forEach(r => {
+                warnings.push({ type: "reservation", text: `Rezervace ${r.contacts?.name || "—"} expiruje ${r.valid_until}` });
+              });
+              leads.filter(l => l.next_contact_date && new Date(l.next_contact_date) < new Date()).forEach(l => {
+                warnings.push({ type: "lead", text: `Lead ${l.contacts?.name || "—"} — prošel termín kontaktu (${l.next_contact_date})` });
+              });
               return warnings.length > 0 ? (
                 <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#A32D2D", marginBottom: 8 }}>⚠️ Upozornění</div>
@@ -398,6 +404,10 @@ export default function Admin() {
                     ["🏠", "Celkem bytů", totalUnits, "#1D9E75"],
                     ["✅", "Prodáno", soldUnits, "#0F6E56"],
                     ["🔓", "Volných", availUnits, "#633806"],
+                    ["🎯", "Leads", leads.length, "#7A4A0A"],
+                    ["📋", "Rezervace", reservations.length, "#4A3A9A"],
+                    ["⚠️", "Expirující", reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).length, "#A32D2D"],
+                    ["👥", "Kontakty", contacts.length, "#0F6E56"],
                   ].map(([icon, label, value, color]) => (
                     <div key={label} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12, padding: "18px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                       <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
