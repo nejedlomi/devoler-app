@@ -127,6 +127,7 @@ export default function Admin() {
   const [leadForm, setLeadForm] = useState({});
   const [reservations, setReservations] = useState([]);
   const [reservationForm, setReservationForm] = useState({});
+  const [dismissedAlerts, setDismissedAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({});
   const [unitForm, setUnitForm] = useState({});
@@ -145,6 +146,7 @@ export default function Admin() {
     loadContactsData();
     loadLeadsData();
     loadReservationsData();
+    loadDismissedAlerts();
     setView("dashboard"); 
   }, []);
 
@@ -245,6 +247,16 @@ export default function Admin() {
   const loadReservationsData = async () => {
     const { data } = await supabase.from("reservations").select("*, contacts(name, phone), units(unit_number, disp, area)").order("created_at", { ascending: false });
     setReservations(data || []);
+  };
+
+  const loadDismissedAlerts = async () => {
+    const { data } = await supabase.from("dismissed_alerts").select("alert_key");
+    setDismissedAlerts((data || []).map(d => d.alert_key));
+  };
+
+  const dismissAlert = async (key) => {
+    await supabase.from("dismissed_alerts").upsert({ alert_key: key });
+    setDismissedAlerts(prev => [...prev, key]);
   };
 
   const saveProject = async () => {
@@ -520,18 +532,26 @@ export default function Admin() {
               const warnings = [];
               if (warnings.length === 0) {
                 const delayedProjects = projects.filter(p => p.completion && new Date(p.completion.replace("Q1", "03-31").replace("Q2", "06-30").replace("Q3", "09-30").replace("Q4", "12-31")) < today);
-                delayedProjects.forEach(p => warnings.push({ type: "delayed", text: `Projekt ${p.name} má termín dokončení v minulosti` }));
+                delayedProjects.forEach(p => warnings.push({ type: "delayed", key: `delayed-${p.id}`, text: `Projekt ${p.name} má termín dokončení v minulosti` }));
               }
               reservations.filter(r => r.valid_until && new Date(r.valid_until) - new Date() < 3 * 24 * 60 * 60 * 1000 && new Date(r.valid_until) > new Date()).forEach(r => {
-                warnings.push({ type: "reservation", text: `Rezervace ${r.contacts?.name || "—"} expiruje ${r.valid_until}` });
+                warnings.push({ type: "reservation", key: `reservation-${r.id}`, text: `Rezervace ${r.contacts?.name || "—"} expiruje ${r.valid_until}` });
               });
               leads.filter(l => l.next_contact_date && new Date(l.next_contact_date) < new Date()).forEach(l => {
-                warnings.push({ type: "lead", text: `Lead ${l.contacts?.name || "—"} — prošel termín kontaktu (${l.next_contact_date})` });
+                warnings.push({ type: "lead", key: `lead-${l.id}`, text: `Lead ${l.contacts?.name || "—"} — prošel termín kontaktu (${l.next_contact_date})` });
               });
-              return warnings.length > 0 ? (
+              const visibleWarnings = warnings.filter(w => !dismissedAlerts.includes(w.key));
+              return visibleWarnings.length > 0 ? (
                 <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#A32D2D", marginBottom: 8 }}>⚠️ Upozornění</div>
-                  {warnings.map((w, i) => <div key={i} style={{ fontSize: 13, color: "#A32D2D", marginBottom: 4 }}>• {w.text}</div>)}
+                  {visibleWarnings.map((w, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: "#A32D2D", marginBottom: 4 }}>
+                      <span>• {w.text}</span>
+                      <button onClick={() => dismissAlert(w.key)} style={{ background: "none", border: "0.5px solid #A32D2D", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#A32D2D", cursor: "pointer", marginLeft: 10 }}>
+                        ✓ Vzato na vědomí
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : null;
             })()}
